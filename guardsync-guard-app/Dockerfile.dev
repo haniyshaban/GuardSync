@@ -1,0 +1,32 @@
+# Development Dockerfile for Vite apps
+FROM node:20-alpine
+
+# Install build dependencies for native modules
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /app
+
+# Copy shared packages first
+COPY shared /shared
+
+# Copy package files
+COPY guardsync-guard-app/package*.json ./
+
+# Install dependencies - force clean install with optional deps
+RUN rm -rf node_modules package-lock.json && npm install --force
+
+# Copy config files
+COPY guardsync-guard-app/vite.config.ts guardsync-guard-app/tsconfig*.json guardsync-guard-app/tailwind.config.ts guardsync-guard-app/postcss.config.js ./
+COPY guardsync-guard-app/components.json ./
+COPY guardsync-guard-app/capacitor.config.ts ./
+
+# Copy source (will be overwritten by volume mount)
+COPY guardsync-guard-app/src ./src
+COPY guardsync-guard-app/public ./public
+COPY guardsync-guard-app/index.html ./
+
+# Expose Vite dev server port
+EXPOSE 8082
+
+# Start Vite dev server with host binding for Docker
+CMD ["npx", "vite", "--host", "0.0.0.0", "--port", "8082"]

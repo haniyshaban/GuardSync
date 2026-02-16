@@ -1,0 +1,185 @@
+{
+  "sites": [
+    {
+      "id": "site-1",
+      "name": "Whitefield Tech Park",
+      "address": "Whitefield, Bangalore",
+      "location": { "lat": 12.9698, "lng": 77.7491 },
+      "geofenceRadius": 100,
+      "geofenceType": "radius",
+      "assignedGuards": ["guard-1","guard-2","guard-3","guard-4","guard-16","guard-25","guard-29"],
+      "isActive": true,
+      "createdAt": "2024-01-15T00:00:00.000Z",
+      "patrolRoute": [
+        { "id": "pp-wf-1", "name": "Main Gate", "latitude": 12.9698, "longitude": 77.7491, "radiusMeters": 15, "order": 1 },
+        { "id": "pp-wf-2", "name": "Parking Area", "latitude": 12.9702, "longitude": 77.7495, "radiusMeters": 15, "order": 2 },
+        { "id": "pp-wf-3", "name": "Building A", "latitude": 12.9705, "longitude": 77.7488, "radiusMeters": 15, "order": 3 },
+        { "id": "pp-wf-4", "name": "Cafeteria", "latitude": 12.9695, "longitude": 77.7485, "radiusMeters": 15, "order": 4 }
+      ]
+    },
+    {
+      "id": "site-2",
+      "name": "Koramangala Mall Complex",
+      "address": "Koramangala, Bangalore",
+      "location": { "lat": 12.9350, "lng": 77.6190 },
+      "geofenceRadius": 150,
+      "geofenceType": "radius",
+      "assignedGuards": ["guard-5","guard-6","guard-7","guard-18","guard-19","guard-20","guard-26","guard-30"],
+      "isActive": true,
+      "createdAt": "2024-02-01T00:00:00.000Z",
+      "patrolRoute": [
+        { "id": "pp-km-1", "name": "Main Entrance", "latitude": 12.9350, "longitude": 77.6190, "radiusMeters": 15, "order": 1 },
+        { "id": "pp-km-2", "name": "Food Court", "latitude": 12.9355, "longitude": 77.6195, "radiusMeters": 15, "order": 2 },
+        { "id": "pp-km-3", "name": "Parking Basement", "latitude": 12.9345, "longitude": 77.6185, "radiusMeters": 15, "order": 3 }
+      ]
+    },
+    {
+      "id": "site-3",
+      "name": "MG Road Business Center",
+      "address": "MG Road, Bangalore",
+      "location": { "lat": 12.9759, "lng": 77.6050 },
+      "geofenceRadius": 100,
+      "geofenceType": "radius",
+      "assignedGuards": ["guard-8","guard-9","guard-10","guard-21","guard-22","guard-23","guard-27"],
+      "isActive": true,
+      "createdAt": "2024-02-10T00:00:00.000Z",
+      "patrolRoute": [
+        { "id": "pp-mg-1", "name": "Reception", "latitude": 12.9759, "longitude": 77.6050, "radiusMeters": 15, "order": 1 },
+        { "id": "pp-mg-2", "name": "Conference Hall", "latitude": 12.9762, "longitude": 77.6055, "radiusMeters": 15, "order": 2 }
+      ]
+    },
+    {
+      "id": "site-4",
+      "name": "Electronic City Park",
+      "address": "Electronic City, Bangalore",
+      "location": { "lat": 12.8390, "lng": 77.6770 },
+      "geofenceRadius": 120,
+      "geofenceType": "radius",
+      "assignedGuards": ["guard-11","guard-12","guard-13","guard-14","guard-15","guard-24","guard-28"],
+      "isActive": true,
+      "createdAt": "2024-03-01T00:00:00.000Z",
+      "patrolRoute": [
+        { "id": "pp-ec-1", "name": "Gate 1", "latitude": 12.8390, "longitude": 77.6770, "radiusMeters": 15, "order": 1 },
+        { "id": "pp-ec-2", "name": "Server Room", "latitude": 12.8395, "longitude": 77.6775, "radiusMeters": 15, "order": 2 },
+        { "id": "pp-ec-3", "name": "Gate 2", "latitude": 12.8385, "longitude": 77.6765, "radiusMeters": 15, "order": 3 }
+      ]
+    },
+    {
+      "id": "site-5",
+      "name": "Jayanagar Residences",
+      "address": "Jayanagar, Bangalore",
+      "location": { "lat": 12.9250, "lng": 77.5838 },
+      "geofenceRadius": 200,
+      "geofenceType": "radius",
+      "assignedGuards": [],
+      "isActive": false,
+      "createdAt": "2024-03-15T00:00:00.000Z"
+    },
+    {
+      "id": "hbr-mini-forest",
+      "name": "HBR Mini Forest",
+      "address": "HBR Layout Mini Forest, Bengaluru, Karnataka",
+      "location": { "lat": 13.034754170670407, "lng": 77.62729627104902 },
+      "geofenceRadius": 200,
+      "geofenceType": "radius",
+      "assignedGuards": ["demo-guard-1", "guard-hbr-2", "guard-hbr-3", "guard-hbr-4"],
+      "isActive": true,
+      "createdAt": "2024-04-01T00:00:00.000Z",
+      "patrolRoute": [
+        { "id": "pp-hbr-1", "name": "Main Entrance", "latitude": 13.034754, "longitude": 77.627296, "radiusMeters": 15, "order": 1 },
+        { "id": "pp-hbr-2", "name": "North Trail Start", "latitude": 13.035154, "longitude": 77.627096, "radiusMeters": 15, "order": 2 },
+        { "id": "pp-hbr-3", "name": "Meditation Point", "latitude": 13.035454, "longitude": 77.627796, "radiusMeters": 15, "order": 3 },
+        { "id": "pp-hbr-4", "name": "East Boundary", "latitude": 13.034954, "longitude": 77.628296, "radiusMeters": 15, "order": 4 },
+        { "id": "pp-hbr-5", "name": "South Exit", "latitude": 13.034354, "longitude": 77.627496, "radiusMeters": 15, "order": 5 }
+      ]
+    }
+  ],
+  "guards": [
+    { "id": "guard-1", "name": "Rajesh Kumar", "phone": "+91 7000000001", "email": "rajesh.kumar1@guardsync.com", "password": null, "employeeId": "EMP1001", "siteId": "site-1", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9702, "lng": 77.7494 }, "locationHistory": [{ "lat": 12.9702, "lng": 77.7494, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Whitefield, Bangalore", "emergencyContact": "+91 9000000001", "dateOfJoining": "2024-01-15", "dailyRate": 800, "aadharNumber": "123456789001", "panNumber": "ABCDE1001F", "bankAccountNumber": "1234567890001", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Rajesh Kumar", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-2", "name": "Amit Singh", "phone": "+91 7000000002", "email": "amit.singh@guardsync.com", "password": null, "employeeId": "EMP1002", "siteId": "site-1", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9696, "lng": 77.7489 }, "locationHistory": [{ "lat": 12.9696, "lng": 77.7489, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Whitefield, Bangalore", "emergencyContact": "+91 9000000002", "dateOfJoining": "2024-01-15", "dailyRate": 800, "aadharNumber": "123456789002", "panNumber": "ABCDE1002F", "bankAccountNumber": "1234567890002", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Amit Singh", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-3", "name": "Suresh Sharma", "phone": "+91 7000000003", "email": "suresh.sharma@guardsync.com", "password": null, "employeeId": "EMP1003", "siteId": "site-1", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.97, "lng": 77.749 }, "locationHistory": [{ "lat": 12.97, "lng": 77.749, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Whitefield, Bangalore", "emergencyContact": "+91 9000000003", "dateOfJoining": "2024-01-15", "dailyRate": 800, "aadharNumber": "123456789003", "panNumber": "ABCDE1003F", "bankAccountNumber": "1234567890003", "bankIfsc": "ICIC0001234", "bankName": "ICICI Bank", "accountHolderName": "Suresh Sharma", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-4", "name": "Vikram Verma", "phone": "+91 7000000004", "email": "vikram.verma@guardsync.com", "password": null, "employeeId": "EMP1004", "siteId": "site-1", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9699, "lng": 77.7493 }, "locationHistory": [{ "lat": 12.9699, "lng": 77.7493, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Whitefield, Bangalore", "emergencyContact": "+91 9000000004", "dateOfJoining": "2024-01-15", "dailyRate": 750, "aadharNumber": "123456789004", "panNumber": "ABCDE1004F", "bankAccountNumber": "1234567890004", "bankIfsc": "UTIB0001234", "bankName": "Axis Bank", "accountHolderName": "Vikram Verma", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-5", "name": "Anil Gupta", "phone": "+91 7000000005", "email": "anil.gupta@guardsync.com", "password": null, "employeeId": "EMP1005", "siteId": "site-2", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9352, "lng": 77.6192 }, "locationHistory": [{ "lat": 12.9352, "lng": 77.6192, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Koramangala, Bangalore", "emergencyContact": "+91 9000000005", "dateOfJoining": "2024-02-01", "dailyRate": 800, "aadharNumber": "123456789005", "panNumber": "ABCDE1005F", "bankAccountNumber": "1234567890005", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Anil Gupta", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-6", "name": "Deepak Patel", "phone": "+91 7000000006", "email": "deepak.patel@guardsync.com", "password": null, "employeeId": "EMP1006", "siteId": "site-2", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9348, "lng": 77.6187 }, "locationHistory": [{ "lat": 12.9348, "lng": 77.6187, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Koramangala, Bangalore", "emergencyContact": "+91 9000000006", "dateOfJoining": "2024-02-01", "dailyRate": 750, "aadharNumber": "123456789006", "panNumber": "ABCDE1006F", "bankAccountNumber": "1234567890006", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Deepak Patel", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-7", "name": "Manish Kapoor", "phone": "+91 7000000007", "email": "manish.kapoor@guardsync.com", "password": null, "employeeId": "EMP1007", "siteId": "site-2", "status": "alert", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9351, "lng": 77.6194 }, "locationHistory": [{ "lat": 12.9351, "lng": 77.6194, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Koramangala, Bangalore", "emergencyContact": "+91 9000000007", "dateOfJoining": "2024-02-01", "dailyRate": 750, "aadharNumber": "123456789007", "panNumber": "ABCDE1007F", "bankAccountNumber": "1234567890007", "bankIfsc": "ICIC0001234", "bankName": "ICICI Bank", "accountHolderName": "Manish Kapoor", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-8", "name": "Sanjay Reddy", "phone": "+91 7000000008", "email": "sanjay.reddy@guardsync.com", "password": null, "employeeId": "EMP1008", "siteId": "site-3", "status": "idle", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9761, "lng": 77.6052 }, "locationHistory": [{ "lat": 12.9761, "lng": 77.6052, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "MG Road, Bangalore", "emergencyContact": "+91 9000000008", "dateOfJoining": "2024-02-10", "dailyRate": 800, "aadharNumber": "123456789008", "panNumber": "ABCDE1008F", "bankAccountNumber": "1234567890008", "bankIfsc": "UTIB0001234", "bankName": "Axis Bank", "accountHolderName": "Sanjay Reddy", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-9", "name": "Ravi Nair", "phone": "+91 7000000009", "email": "ravi.nair@guardsync.com", "password": null, "employeeId": "EMP1009", "siteId": "site-3", "status": "offline", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9756, "lng": 77.6048 }, "locationHistory": [{ "lat": 12.9756, "lng": 77.6048, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": false, "clockInTime": null, "currentShiftId": null, "address": "MG Road, Bangalore", "emergencyContact": "+91 9000000009", "dateOfJoining": "2024-02-10", "dailyRate": 750, "aadharNumber": "123456789009", "panNumber": "ABCDE1009F", "bankAccountNumber": "1234567890009", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Ravi Nair", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-10", "name": "Prakash Mehta", "phone": "+91 7000000010", "email": "prakash.mehta@guardsync.com", "password": null, "employeeId": "EMP1010", "siteId": "site-3", "status": "idle", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9758, "lng": 77.6051 }, "locationHistory": [{ "lat": 12.9758, "lng": 77.6051, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "MG Road, Bangalore", "emergencyContact": "+91 9000000010", "dateOfJoining": "2024-02-10", "dailyRate": 750, "aadharNumber": "123456789010", "panNumber": "ABCDE1010F", "bankAccountNumber": "1234567890010", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Prakash Mehta", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-11", "name": "Arjun Rao", "phone": "+91 7000000011", "email": "arjun.rao@guardsync.com", "password": null, "employeeId": "EMP1011", "siteId": "site-4", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.83960, "lng": 77.67720 }, "locationHistory": [{ "lat": 12.83960, "lng": 77.67720, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Electronic City, Bangalore", "emergencyContact": "+91 9000000011", "dateOfJoining": "2024-03-01", "dailyRate": 800, "aadharNumber": "123456789011", "panNumber": "ABCDE1011F", "bankAccountNumber": "1234567890011", "bankIfsc": "ICIC0001234", "bankName": "ICICI Bank", "accountHolderName": "Arjun Rao", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-12", "name": "Priya Shetty", "phone": "+91 7000000012", "email": "priya.shetty@guardsync.com", "password": null, "employeeId": "EMP1012", "siteId": "site-4", "status": "alert", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.83870, "lng": 77.67660 }, "locationHistory": [{ "lat": 12.83870, "lng": 77.67660, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Electronic City, Bangalore", "emergencyContact": "+91 9000000012", "dateOfJoining": "2024-03-01", "dailyRate": 750, "aadharNumber": "123456789012", "panNumber": "ABCDE1012F", "bankAccountNumber": "1234567890012", "bankIfsc": "UTIB0001234", "bankName": "Axis Bank", "accountHolderName": "Priya Shetty", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-13", "name": "Sunil Das", "phone": "+91 7000000013", "email": "sunil.das@guardsync.com", "password": null, "employeeId": "EMP1013", "siteId": "site-4", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.83920, "lng": 77.67800 }, "locationHistory": [{ "lat": 12.83920, "lng": 77.67800, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Electronic City, Bangalore", "emergencyContact": "+91 9000000013", "dateOfJoining": "2024-03-01", "dailyRate": 750, "aadharNumber": "123456789013", "panNumber": "ABCDE1013F", "bankAccountNumber": "1234567890013", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Sunil Das", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-14", "name": "Meena Iyer", "phone": "+91 7000000014", "email": "meena.iyer@guardsync.com", "password": null, "employeeId": "EMP1014", "siteId": "site-4", "status": "idle", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.83890, "lng": 77.67680 }, "locationHistory": [{ "lat": 12.83890, "lng": 77.67680, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Electronic City, Bangalore", "emergencyContact": "+91 9000000014", "dateOfJoining": "2024-03-01", "dailyRate": 750, "aadharNumber": "123456789014", "panNumber": "ABCDE1014F", "bankAccountNumber": "1234567890014", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Meena Iyer", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-15", "name": "Kiran Babu", "phone": "+91 7000000015", "email": "kiran.babu@guardsync.com", "password": null, "employeeId": "EMP1015", "siteId": "site-4", "status": "alert", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.83940, "lng": 77.67650 }, "locationHistory": [{ "lat": 12.83940, "lng": 77.67650, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Electronic City, Bangalore", "emergencyContact": "+91 9000000015", "dateOfJoining": "2024-03-01", "dailyRate": 750, "aadharNumber": "123456789015", "panNumber": "ABCDE1015F", "bankAccountNumber": "1234567890015", "bankIfsc": "ICIC0001234", "bankName": "ICICI Bank", "accountHolderName": "Kiran Babu", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-16", "name": "Naveen Rao", "phone": "+91 7000000016", "email": "naveen.rao@guardsync.com", "password": null, "employeeId": "EMP1016", "siteId": "site-1", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9697, "lng": 77.7490 }, "locationHistory": [{ "lat": 12.9697, "lng": 77.7490, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Whitefield, Bangalore", "emergencyContact": "+91 9000000016", "dateOfJoining": "2024-01-20", "dailyRate": 750, "aadharNumber": "123456789016", "panNumber": "ABCDE1016F", "bankAccountNumber": "1234567890016", "bankIfsc": "UTIB0001234", "bankName": "Axis Bank", "accountHolderName": "Naveen Rao", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-17", "name": "Leena Rao", "phone": "+91 7000000017", "email": "leena.rao@guardsync.com", "password": null, "employeeId": "EMP1017", "siteId": "site-1", "status": "idle", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9701, "lng": 77.7492 }, "locationHistory": [{ "lat": 12.9701, "lng": 77.7492, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Whitefield, Bangalore", "emergencyContact": "+91 9000000017", "dateOfJoining": "2024-01-20", "dailyRate": 750, "aadharNumber": "123456789017", "panNumber": "ABCDE1017F", "bankAccountNumber": "1234567890017", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Leena Rao", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-18", "name": "Rohit Menon", "phone": "+91 7000000018", "email": "rohit.menon@guardsync.com", "password": null, "employeeId": "EMP1018", "siteId": "site-2", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9353, "lng": 77.6191 }, "locationHistory": [{ "lat": 12.9353, "lng": 77.6191, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Koramangala, Bangalore", "emergencyContact": "+91 9000000018", "dateOfJoining": "2024-02-05", "dailyRate": 750, "aadharNumber": "123456789018", "panNumber": "ABCDE1018F", "bankAccountNumber": "1234567890018", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Rohit Menon", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-19", "name": "Anita Rao", "phone": "+91 7000000019", "email": "anita.rao@guardsync.com", "password": null, "employeeId": "EMP1019", "siteId": "site-2", "status": "alert", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9349, "lng": 77.6189 }, "locationHistory": [{ "lat": 12.9349, "lng": 77.6189, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Koramangala, Bangalore", "emergencyContact": "+91 9000000019", "dateOfJoining": "2024-02-05", "dailyRate": 750, "aadharNumber": "123456789019", "panNumber": "ABCDE1019F", "bankAccountNumber": "1234567890019", "bankIfsc": "ICIC0001234", "bankName": "ICICI Bank", "accountHolderName": "Anita Rao", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-20", "name": "Vivek Sharma", "phone": "+91 7000000020", "email": "vivek.sharma@guardsync.com", "password": null, "employeeId": "EMP1020", "siteId": "site-2", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9350, "lng": 77.6195 }, "locationHistory": [{ "lat": 12.9350, "lng": 77.6195, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Koramangala, Bangalore", "emergencyContact": "+91 9000000020", "dateOfJoining": "2024-02-05", "dailyRate": 750, "aadharNumber": "123456789020", "panNumber": "ABCDE1020F", "bankAccountNumber": "1234567890020", "bankIfsc": "UTIB0001234", "bankName": "Axis Bank", "accountHolderName": "Vivek Sharma", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-21", "name": "Karthik Iyer", "phone": "+91 7000000021", "email": "karthik.iyer@guardsync.com", "password": null, "employeeId": "EMP1021", "siteId": "site-3", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9760, "lng": 77.6050 }, "locationHistory": [{ "lat": 12.9760, "lng": 77.6050, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "MG Road, Bangalore", "emergencyContact": "+91 9000000021", "dateOfJoining": "2024-02-15", "dailyRate": 750, "aadharNumber": "123456789021", "panNumber": "ABCDE1021F", "bankAccountNumber": "1234567890021", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Karthik Iyer", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-22", "name": "Priyanka Nair", "phone": "+91 7000000022", "email": "priyanka.nair@guardsync.com", "password": null, "employeeId": "EMP1022", "siteId": "site-3", "status": "idle", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9757, "lng": 77.6050 }, "locationHistory": [{ "lat": 12.9757, "lng": 77.6050, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "MG Road, Bangalore", "emergencyContact": "+91 9000000022", "dateOfJoining": "2024-02-15", "dailyRate": 750, "aadharNumber": "123456789022", "panNumber": "ABCDE1022F", "bankAccountNumber": "1234567890022", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Priyanka Nair", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-23", "name": "Rahul Desai", "phone": "+91 7000000023", "email": "rahul.desai@guardsync.com", "password": null, "employeeId": "EMP1023", "siteId": "site-3", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9759, "lng": 77.6052 }, "locationHistory": [{ "lat": 12.9759, "lng": 77.6052, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "MG Road, Bangalore", "emergencyContact": "+91 9000000023", "dateOfJoining": "2024-02-15", "dailyRate": 750, "aadharNumber": "123456789023", "panNumber": "ABCDE1023F", "bankAccountNumber": "1234567890023", "bankIfsc": "ICIC0001234", "bankName": "ICICI Bank", "accountHolderName": "Rahul Desai", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-24", "name": "Rina Thomas", "phone": "+91 7000000024", "email": "rina.thomas@guardsync.com", "password": null, "employeeId": "EMP1024", "siteId": "site-4", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.8388, "lng": 77.6776 }, "locationHistory": [{ "lat": 12.8388, "lng": 77.6776, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Electronic City, Bangalore", "emergencyContact": "+91 9000000024", "dateOfJoining": "2024-03-05", "dailyRate": 750, "aadharNumber": "123456789024", "panNumber": "ABCDE1024F", "bankAccountNumber": "1234567890024", "bankIfsc": "UTIB0001234", "bankName": "Axis Bank", "accountHolderName": "Rina Thomas", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-25", "name": "Sandeep Kulkarni", "phone": "+91 7000000025", "email": "sandeep.kulkarni@guardsync.com", "password": null, "employeeId": "EMP1025", "siteId": "site-1", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9700, "lng": 77.7490 }, "locationHistory": [{ "lat": 12.9700, "lng": 77.7490, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Whitefield, Bangalore", "emergencyContact": "+91 9000000025", "dateOfJoining": "2024-01-25", "dailyRate": 750, "aadharNumber": "123456789025", "panNumber": "ABCDE1025F", "bankAccountNumber": "1234567890025", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Sandeep Kulkarni", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-26", "name": "Nisha Rao", "phone": "+91 7000000026", "email": "nisha.rao@guardsync.com", "password": null, "employeeId": "EMP1026", "siteId": "site-2", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9351, "lng": 77.6190 }, "locationHistory": [{ "lat": 12.9351, "lng": 77.6190, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Koramangala, Bangalore", "emergencyContact": "+91 9000000026", "dateOfJoining": "2024-02-10", "dailyRate": 750, "aadharNumber": "123456789026", "panNumber": "ABCDE1026F", "bankAccountNumber": "1234567890026", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Nisha Rao", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-27", "name": "Vijay Kumar", "phone": "+91 7000000027", "email": "vijay.kumar@guardsync.com", "password": null, "employeeId": "EMP1027", "siteId": "site-3", "status": "idle", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9760, "lng": 77.6050 }, "locationHistory": [{ "lat": 12.9760, "lng": 77.6050, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "MG Road, Bangalore", "emergencyContact": "+91 9000000027", "dateOfJoining": "2024-02-20", "dailyRate": 750, "aadharNumber": "123456789027", "panNumber": "ABCDE1027F", "bankAccountNumber": "1234567890027", "bankIfsc": "ICIC0001234", "bankName": "ICICI Bank", "accountHolderName": "Vijay Kumar", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-28", "name": "Anu Menon", "phone": "+91 7000000028", "email": "anu.menon@guardsync.com", "password": null, "employeeId": "EMP1028", "siteId": "site-4", "status": "idle", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.8390, "lng": 77.6769 }, "locationHistory": [{ "lat": 12.8390, "lng": 77.6769, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Electronic City, Bangalore", "emergencyContact": "+91 9000000028", "dateOfJoining": "2024-03-10", "dailyRate": 750, "aadharNumber": "123456789028", "panNumber": "ABCDE1028F", "bankAccountNumber": "1234567890028", "bankIfsc": "UTIB0001234", "bankName": "Axis Bank", "accountHolderName": "Anu Menon", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-29", "name": "Suresh Nair", "phone": "+91 7000000029", "email": "suresh.nair@guardsync.com", "password": null, "employeeId": "EMP1029", "siteId": "site-1", "status": "online", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9703, "lng": 77.7495 }, "locationHistory": [{ "lat": 12.9703, "lng": 77.7495, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Whitefield, Bangalore", "emergencyContact": "+91 9000000029", "dateOfJoining": "2024-01-25", "dailyRate": 750, "aadharNumber": "123456789029", "panNumber": "ABCDE1029F", "bankAccountNumber": "1234567890029", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Suresh Nair", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-30", "name": "Geeta Sharma", "phone": "+91 7000000030", "email": "geeta.sharma@guardsync.com", "password": null, "employeeId": "EMP1030", "siteId": "site-2", "status": "idle", "lastSeen": "2026-01-09T00:00:00.000Z", "location": { "lat": 12.9349, "lng": 77.6192 }, "locationHistory": [{ "lat": 12.9349, "lng": 77.6192, "at": "2026-01-09T00:00:00.000Z" }], "clockedIn": true, "clockInTime": "2026-01-09T00:00:00.000Z", "currentShiftId": null, "address": "Koramangala, Bangalore", "emergencyContact": "+91 9000000030", "dateOfJoining": "2024-02-10", "dailyRate": 750, "aadharNumber": "123456789030", "panNumber": "ABCDE1030F", "bankAccountNumber": "1234567890030", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Geeta Sharma", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    
+    { "id": "demo-guard-1", "name": "Rajesh Kumar", "phone": "+91 98765 43210", "email": "rajesh.kumar@guardsync.com", "password": null, "employeeId": "GW-2024-0147", "siteId": "hbr-mini-forest", "status": "online", "lastSeen": "2026-01-31T00:00:00.000Z", "location": { "lat": 13.034754, "lng": 77.627296 }, "locationHistory": [], "clockedIn": false, "clockInTime": null, "currentShiftId": null, "address": "42, 2nd Cross, HBR Layout, Bengaluru, Karnataka 560043", "emergencyContact": "+91 98765 00001", "dateOfJoining": "2024-01-15", "dailyRate": 800, "aadharNumber": "234567891234", "panNumber": "ABCDE1234F", "bankAccountNumber": "1234567890123456", "bankIfsc": "SBIN0001234", "bankName": "State Bank of India", "accountHolderName": "Rajesh Kumar", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-hbr-2", "name": "Suresh Reddy", "phone": "+91 98765 43211", "email": "suresh.reddy@guardsync.com", "password": null, "employeeId": "GW-2024-0148", "siteId": "hbr-mini-forest", "status": "offline", "lastSeen": "2026-01-31T00:00:00.000Z", "location": { "lat": 13.034954, "lng": 77.627496 }, "locationHistory": [], "clockedIn": false, "clockInTime": null, "currentShiftId": null, "address": "15, 5th Main, Kalyan Nagar, Bengaluru, Karnataka 560043", "emergencyContact": "+91 98765 00002", "dateOfJoining": "2024-02-01", "dailyRate": 750, "aadharNumber": "345678912345", "panNumber": "FGHIJ5678K", "bankAccountNumber": "2345678901234567", "bankIfsc": "HDFC0001234", "bankName": "HDFC Bank", "accountHolderName": "Suresh Reddy", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" },
+    { "id": "guard-hbr-3", "name": "Mohammed Farhan", "phone": "+91 98765 43212", "email": "farhan.m@guardsync.com", "password": null, "employeeId": "GW-2024-0149", "siteId": "hbr-mini-forest", "status": "offline", "lastSeen": "2026-01-31T00:00:00.000Z", "location": { "lat": 13.035154, "lng": 77.627096 }, "locationHistory": [], "clockedIn": false, "clockInTime": null, "currentShiftId": null, "address": "8, 3rd Block, HRBR Layout, Bengaluru, Karnataka 560043", "emergencyContact": "+91 98765 00003", "dateOfJoining": "2024-02-15", "dailyRate": 750, "aadharNumber": "456789123456", "panNumber": "KLMNO9012P", "bankAccountNumber": "3456789012345678", "bankIfsc": "ICIC0001234", "bankName": "ICICI Bank", "accountHolderName": "Mohammed Farhan", "shiftType": "day", "shiftStartTime": "08:00", "shiftEndTime": "20:00" },
+    { "id": "guard-hbr-4", "name": "Venkat Prasad", "phone": "+91 98765 43213", "email": "venkat.p@guardsync.com", "password": null, "employeeId": "GW-2024-0150", "siteId": "hbr-mini-forest", "status": "idle", "lastSeen": "2026-01-31T00:00:00.000Z", "location": { "lat": 13.034354, "lng": 77.627796 }, "locationHistory": [], "clockedIn": false, "clockInTime": null, "currentShiftId": null, "address": "23, 1st Cross, Kammanahalli, Bengaluru, Karnataka 560084", "emergencyContact": "+91 98765 00004", "dateOfJoining": "2024-03-01", "dailyRate": 750, "aadharNumber": "567891234567", "panNumber": "QRSTU3456V", "bankAccountNumber": "4567890123456789", "bankIfsc": "UTIB0001234", "bankName": "Axis Bank", "accountHolderName": "Venkat Prasad", "shiftType": "night", "shiftStartTime": "20:00", "shiftEndTime": "08:00" }
+  ],
+  "staff": [
+    {
+      "id": "staff-001",
+      "name": "Rakesh Sharma",
+      "email": "officer@guardsync.com",
+      "password": null,
+      "phone": "+91 98765 12345",
+      "employeeId": "GWS-2024-001",
+      "role": "staff",
+      "assignedArea": "Bengaluru North",
+      "status": "offline",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "staff-002",
+      "name": "Priya Menon",
+      "email": "priya.menon@guardsync.com",
+      "password": null,
+      "phone": "+91 98765 12346",
+      "employeeId": "GWS-2024-002",
+      "role": "staff",
+      "assignedArea": "Bengaluru South",
+      "status": "offline",
+      "createdAt": "2024-01-15T00:00:00.000Z"
+    },
+    {
+      "id": "staff-003",
+      "name": "Arun Kumar",
+      "email": "arun.kumar@guardsync.com",
+      "password": null,
+      "phone": "+91 98765 12347",
+      "employeeId": "GWS-2024-003",
+      "role": "staff",
+      "assignedArea": "Bengaluru Central",
+      "status": "offline",
+      "createdAt": "2024-02-01T00:00:00.000Z"
+    },
+    {
+      "id": "staff-admin",
+      "name": "Admin User",
+      "email": "admin@guardsync.com",
+      "password": null,
+      "phone": "+91 98765 00000",
+      "employeeId": "GWS-2024-ADMIN",
+      "role": "admin",
+      "assignedArea": "All",
+      "status": "offline",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+

@@ -1,0 +1,15 @@
+
+task buildGuardApp(type: GradleBuild) {
+    dir = 'guardsync-guard-app/android'
+    tasks = ['assembleRelease']
+}
+
+task buildStaffApp(type: GradleBuild) {
+    dir = 'guardsync-staff-app/android'
+    tasks = ['assembleRelease']
+}
+
+task buildAllApks {
+    dependsOn buildGuardApp
+    dependsOn buildStaffApp
+}

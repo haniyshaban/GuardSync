@@ -1,0 +1,26 @@
+# API Server Dockerfile
+FROM node:20-alpine
+
+# Install build dependencies for native modules (better-sqlite3)
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /app
+
+# Copy shared packages first (for @guardsync dependencies)
+COPY shared /app/shared
+
+# Copy server package files
+COPY guardsync-admin/server/package*.json ./server/
+
+# Install server dependencies
+WORKDIR /app/server
+RUN npm ci || npm install
+
+# Copy server source files
+COPY guardsync-admin/server ./
+
+# Expose API port
+EXPOSE 4000
+
+# Start the API server
+CMD ["node", "index.js"]

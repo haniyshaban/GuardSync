@@ -1,0 +1,9 @@
+{
+  "name": "@guardsync/api-client",
+  "version": "1.0.0",
+  "description": "Shared API client service for GuardSync applications",
+  "main": "index.ts",
+  "types": "index.ts",
+  "license": "UNLICENSED",
+  "private": true
+}

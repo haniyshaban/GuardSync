@@ -1,0 +1,284 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark command center theme - consistent with admin */
+    --background: 222 47% 6%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    /* Electric cyan primary - same as admin */
+    --primary: 192 95% 50%;
+    --primary-foreground: 222 47% 6%;
+    --primary-glow: 192 95% 60%;
+
+    /* Muted blue-gray - consistent accent */
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 33% 14%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 217 33% 20%;
+    --accent-foreground: 210 40% 96%;
+
+    /* Alert colors */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 6%;
+
+    --info: 199 89% 48%;
+    --info-foreground: 222 47% 6%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 192 95% 50%;
+
+    --radius: 0.5rem;
+
+    /* Status colors - consistent with admin */
+    --status-online: 142 76% 46%;
+    --status-offline: 0 72% 51%;
+    --status-idle: 38 92% 50%;
+    --status-alert: 0 84% 60%;
+    --status-panic: 0 85% 50%;
+    --status-pending: 38 92% 50%;
+
+    /* Sidebar */
+    --sidebar-background: 222 47% 5%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 192 95% 50%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 217 33% 14%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 33% 12%;
+    --sidebar-ring: 192 95% 50%;
+
+    /* Gradients - consistent with admin */
+    --gradient-primary: linear-gradient(135deg, hsl(192 95% 50%), hsl(199 89% 48%));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(160 84% 39%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(222 47% 8%), hsl(222 47% 4%));
+    --gradient-card: linear-gradient(145deg, hsl(222 47% 10%), hsl(222 47% 6%));
+    --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+    --gradient-glow: radial-gradient(ellipse at center, hsl(192 95% 50% / 0.15), transparent 70%);
+
+    /* Shadows */
+    --shadow-glow: 0 0 20px hsl(192 95% 50% / 0.3);
+    --shadow-card: 0 4px 24px hsl(222 47% 2% / 0.6);
+    --shadow-elevated: 0 8px 32px hsl(222 47% 2% / 0.8);
+
+    /* Typography */
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  .dark {
+    /* Same as root - dark by default */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/30;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Glass card effect */
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-white/10 rounded-lg;
+    background-image: var(--gradient-glass);
+  }
+
+  /* Card variants */
+  .card-elevated {
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-card);
+    @apply border border-border/50;
+  }
+
+  .card-glow {
+    @apply card-elevated;
+    box-shadow: var(--shadow-glow), var(--shadow-card);
+  }
+
+  /* Gradient utilities */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-success {
+    background: var(--gradient-success);
+  }
+
+  /* Glow effects */
+  .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .glow-text {
+    text-shadow: 0 0 20px hsl(192 95% 50% / 0.5);
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Status indicators */
+  .status-dot {
+    @apply w-2.5 h-2.5 rounded-full;
+  }
+
+  .status-indicator {
+    @apply w-2.5 h-2.5 rounded-full;
+  }
+
+  .status-online {
+    @apply bg-[hsl(var(--status-online))];
+    box-shadow: 0 0 8px hsl(var(--status-online) / 0.6);
+  }
+
+  .status-active {
+    @apply bg-[hsl(var(--status-online))];
+    box-shadow: 0 0 8px hsl(var(--status-online) / 0.6);
+  }
+
+  .status-offline {
+    @apply bg-[hsl(var(--status-offline))];
+  }
+
+  .status-idle {
+    @apply bg-[hsl(var(--status-idle))];
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .status-alert {
+    @apply bg-[hsl(var(--status-alert))];
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  .status-panic {
+    @apply bg-[hsl(var(--status-panic))];
+    box-shadow: 0 0 14px hsl(var(--status-panic) / 0.85);
+    animation: panic-pulse 0.7s ease-in-out infinite;
+  }
+
+  .status-pending {
+    @apply bg-amber-500;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Animation utilities */
+  .scan-line {
+    @apply absolute left-0 right-0 h-0.5 bg-primary;
+    animation: scan 2s ease-in-out infinite;
+  }
+
+  .pulse-ring {
+    @apply absolute inset-0 rounded-full border-2 border-primary;
+    animation: pulse-ring 1.5s ease-out infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes panic-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 8px rgba(255,0,0,0.6));
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.6;
+    filter: drop-shadow(0 0 20px rgba(255,0,0,0.9));
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 8px rgba(255,0,0,0.6));
+  }
+}
+
+@keyframes scan {
+  0%, 100% {
+    top: 10%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+  60% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}

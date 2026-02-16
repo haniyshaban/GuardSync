@@ -1,0 +1,100 @@
+services:
+  # API Server (Express + SQLite)
+  api:
+    build:
+      context: .
+      dockerfile: ./guardsync-admin/Dockerfile.api
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./guardsync-admin/server:/app/server
+      - ./shared:/app/shared
+      - api-data:/app/server/data
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      # Logging configuration
+      # Options: trace, debug, info, warn, error, fatal
+      - LOG_LEVEL=info
+      # JWT Secret for authentication tokens (AES-256 compatible)
+      # IMPORTANT: Generate a new secure key for production using:
+      # openssl rand -hex 64 OR node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+      - JWT_SECRET=ced7e9485af46538d3b49fdcb3cea5cb00576309016bd913b8a97eb21c5c8e8cfadf0cf97bd5ddea81b4f04ba0f1b9a94b7c9756007046775d2e44f01489ec53
+      # PII Encryption Key (AES-256-GCM) - 64 hex characters (32 bytes)
+      # IMPORTANT: Generate a new secure key for production using:
+      # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      - ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      # Initial Admin Credentials (optional - will be auto-generated if not provided)
+      # - ADMIN_EMAIL=admin@guardsync.com
+      # - ADMIN_PASSWORD=your-secure-password-here
+      # Default password for all guards (optional - will be auto-generated if not provided)
+      # - DEFAULT_GUARD_PASSWORD=your-secure-guard-password-here
+    restart: unless-stopped
+
+  # GuardSync Admin Dashboard
+  admin:
+    build:
+      context: .
+      dockerfile: ./guardsync-admin/Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./guardsync-admin/src:/app/src
+      - ./guardsync-admin/public:/app/public
+      - ./guardsync-admin/index.html:/app/index.html
+      - ./shared:/shared
+    environment:
+      # API URL for frontend to connect to backend
+      # For Docker: use http://localhost:4000 (host network)
+      # For production: use https://api.yourserver.com
+      - VITE_API_URL=http://localhost:4000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # GuardSync Guard App (Mobile App)
+  guard-app:
+    build:
+      context: .
+      dockerfile: ./guardsync-guard-app/Dockerfile.dev
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./guardsync-guard-app/src:/app/src
+      - ./guardsync-guard-app/public:/app/public
+      - ./guardsync-guard-app/index.html:/app/index.html
+      - ./shared:/shared
+    environment:
+      # API URL for frontend to connect to backend
+      # For Docker: use http://localhost:4000 (host network)
+      # For production: use https://api.yourserver.com
+      # For Capacitor builds: set before building (see capacitor.config.ts)
+      - VITE_API_URL=http://localhost:4000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # GuardSync Staff App
+  staff-app:
+    build:
+      context: .
+      dockerfile: ./guardsync-staff-app/Dockerfile.dev
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./guardsync-staff-app/src:/app/src
+      - ./guardsync-staff-app/public:/app/public
+      - ./guardsync-staff-app/index.html:/app/index.html
+      - ./shared:/shared
+    environment:
+      # API URL for frontend to connect to backend
+      # For Docker: use http://localhost:4000 (host network)
+      # For production: use https://api.yourserver.com
+      # For Capacitor builds: set before building (see capacitor.config.ts)
+      - VITE_API_URL=http://localhost:4000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  api-data:

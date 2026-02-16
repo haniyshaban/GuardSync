@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.git
+*.log
+.env.local
+.env.*.local
+android/build
+android/.gradle
+*.apk

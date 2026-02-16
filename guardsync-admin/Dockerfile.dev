@@ -1,0 +1,28 @@
+# Development Dockerfile for Admin Frontend (Vite)
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy shared packages first
+COPY shared /shared
+
+# Copy package files
+COPY guardsync-admin/package*.json ./
+
+# Install frontend dependencies
+RUN npm ci || npm install
+
+# Copy config files
+COPY guardsync-admin/vite.config.ts guardsync-admin/tsconfig*.json guardsync-admin/tailwind.config.ts guardsync-admin/postcss.config.js ./
+COPY guardsync-admin/components.json ./
+
+# Copy source (will be overwritten by volume mount)
+COPY guardsync-admin/src ./src
+COPY guardsync-admin/public ./public
+COPY guardsync-admin/index.html ./
+
+# Expose Vite dev server port
+EXPOSE 8080
+
+# Start Vite dev server with host binding for Docker
+CMD ["npx", "vite", "--host", "0.0.0.0", "--port", "8080"]
