@@ -1,5 +1,6 @@
 import express from 'express';
 import { authMiddleware } from '../auth.js';
+import { ownParam } from '../middleware/access.js';
 import { validate } from '../validation/index.js';
 import { updatePayrollSchema } from '../validation/payroll.schemas.js';
 import { payrollRepo, guardRepo, attendanceRepo } from '../repositories/index.js';
@@ -8,7 +9,7 @@ import { success, created, error, badRequest, notFound, unauthorized, forbidden,
 const router = express.Router();
 
 // GET /api/payroll/:guardId - Get all payroll records for a guard
-router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('guardId'), (req, res) => {
   try {
     const guardId = req.params.guardId;
     const records = payrollRepo.findByGuardId(guardId);
@@ -19,7 +20,7 @@ router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), (req,
 });
 
 // GET /api/payroll/:guardId/:month/:year - Get specific month payroll for a guard
-router.get('/:guardId/:month/:year', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/:guardId/:month/:year', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('guardId'), (req, res) => {
   try {
     const { guardId, month, year } = req.params;
     let record = payrollRepo.findByGuardMonthYear(guardId, month, year);

@@ -1,5 +1,6 @@
 import express from 'express';
 import { authMiddleware } from '../auth.js';
+import { isGuard, guardSiteId, ownSiteParam } from '../middleware/access.js';
 import { validate } from '../validation/index.js';
 import { createSiteSchema, updateSiteSchema } from '../validation/site.schemas.js';
 import { siteRepo } from '../repositories/index.js';
@@ -11,11 +12,15 @@ const router = express.Router();
 // GET /api/sites - Get all sites
 router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
   const sites = siteRepo.findAllWithRelations();
+  if (isGuard(req)) {
+    const own = guardSiteId(req);
+    return success(res, sites.filter((site) => site.id === own));
+  }
   return success(res, sites);
 });
 
 // GET /api/sites/:id - Get single site
-router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), ownSiteParam('id'), (req, res) => {
   const site = siteRepo.findByIdWithRelations(req.params.id);
   if (!site) return notFound(res, 'site', req.params.id);
   return success(res, site);

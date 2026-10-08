@@ -1,5 +1,7 @@
 import express from 'express';
+import { randomUUID } from 'crypto';
 import { authMiddleware } from '../auth.js';
+import { actAsSelf, scopeQueryToSelf, ownsRow } from '../middleware/access.js';
 import { validate } from '../validation/index.js';
 import { createLeaveRequestSchema, updateLeaveRequestSchema } from '../validation/leave.schemas.js';
 import { leaveRepo } from '../repositories/index.js';
@@ -11,9 +13,9 @@ const router = express.Router();
 const leaveRowToObj = (row) => row;
 
 // GET leave requests for a guard
-router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), scopeQueryToSelf, (req, res) => {
   try {
-    const { guardId } = req.query;
+    const guardId = req.query.guardId || req.query.guard_id;
     let rows;
     if (guardId) {
       rows = leaveRepo.findByGuardId(guardId);
@@ -27,7 +29,7 @@ router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) =>
 });
 
 // GET single leave request
-router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), ownsRow('leave_requests'), (req, res) => {
   try {
     const row = leaveRepo.findById(req.params.id);
     if (!row) return notFound(res, 'leave request', req.params.id);
@@ -38,7 +40,7 @@ router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res)
 });
 
 // POST create leave request
-router.post('/', authMiddleware(true, ['guard', 'admin']), validate(createLeaveRequestSchema), (req, res) => {
+router.post('/', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(createLeaveRequestSchema), (req, res) => {
   const l = req.body;
   const id = randomUUID();
   try {

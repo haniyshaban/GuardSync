@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../db.js';
 import { authMiddleware } from '../auth.js';
+import { ownParam } from '../middleware/access.js';
 import { success, created, error, badRequest, notFound, unauthorized, forbidden, conflict, serverError, noContent } from '../utils/responses.js';
 
 const router = express.Router();
@@ -56,7 +57,7 @@ router.get('/dashboard', authMiddleware(true, ['staff', 'admin']), (req, res) =>
 });
 
 // GET /api/stats/guard/:guardId - Get stats for a specific guard
-router.get('/guard/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/guard/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('guardId'), (req, res) => {
   try {
     const guardId = req.params.guardId;
     

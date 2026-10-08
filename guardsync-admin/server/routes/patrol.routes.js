@@ -2,6 +2,7 @@ import express from 'express';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { authMiddleware } from '../auth.js';
+import { actAsSelf, ownParam, ownSiteParam } from '../middleware/access.js';
 import { validate, validateQuery } from '../validation/index.js';
 import { createPatrolLogSchema, patrolLogQuerySchema } from '../validation/patrol.schemas.js';
 import { success, created, error, badRequest, notFound, unauthorized, forbidden, conflict, serverError, noContent } from '../utils/responses.js';
@@ -9,7 +10,7 @@ import { success, created, error, badRequest, notFound, unauthorized, forbidden,
 const router = express.Router();
 
 // GET /api/patrol-logs/:guardId - Get patrol logs for a guard
-router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), validateQuery(patrolLogQuerySchema), (req, res) => {
+router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('guardId'), validateQuery(patrolLogQuerySchema), (req, res) => {
   try {
     const { date, shiftId } = req.query;
     let query = 'SELECT * FROM patrol_logs WHERE guardId = ?';
@@ -39,7 +40,7 @@ router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), valid
 });
 
 // POST /api/patrol-logs - Create a patrol log entry
-router.post('/', authMiddleware(true, ['guard', 'admin']), validate(createPatrolLogSchema), (req, res) => {
+router.post('/', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(createPatrolLogSchema), (req, res) => {
   try {
     const { guardId, siteId, patrolPointId, patrolPointName, shiftId, lat, lng, withinRadius, distanceFromPoint } = req.body;
     const id = randomUUID();
@@ -61,7 +62,7 @@ router.post('/', authMiddleware(true, ['guard', 'admin']), validate(createPatrol
 });
 
 // GET /api/patrol-logs/site/:siteId - Get patrol logs for a site
-router.get('/site/:siteId', authMiddleware(true, ['guard', 'staff', 'admin']), validateQuery(patrolLogQuerySchema.pick({ date: true })), (req, res) => {
+router.get('/site/:siteId', authMiddleware(true, ['guard', 'staff', 'admin']), ownSiteParam('siteId'), validateQuery(patrolLogQuerySchema.pick({ date: true })), (req, res) => {
   try {
     const { date } = req.query;
     let query = 'SELECT * FROM patrol_logs WHERE siteId = ?';

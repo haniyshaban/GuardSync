@@ -47,13 +47,17 @@ export async function seedDatabase() {
     const raw = fs.readFileSync(INITIAL_JSON, 'utf-8');
     const parsed = JSON.parse(raw);
     
+    // Demo data (sample sites, guards and staff) is only loaded when asked for.
+    // Without it the system starts empty with a single admin account.
+    const seedDemo = process.env.SEED_DEMO === 'true';
+
     // Track if this is the initial seed (for printing credentials)
     const isInitialSeed = db.prepare('SELECT COUNT(*) as c FROM staff').get().c === 0;
     const generatedCredentials = [];
     
     // Seed sites if empty
     const sitesCount = db.prepare('SELECT COUNT(*) as c FROM sites').get().c;
-    if (sitesCount === 0 && Array.isArray(parsed.sites)) {
+    if (seedDemo && sitesCount === 0 && Array.isArray(parsed.sites)) {
         const insert = db.prepare(`INSERT INTO sites (id,name,address,lat,lng,geofenceRadius,geofenceType,geofencePolygon,assignedGuards,isActive,createdAt,patrolRoute)
           VALUES (@id,@name,@address,@lat,@lng,@geofenceRadius,@geofenceType,@geofencePolygon,@assignedGuards,@isActive,@createdAt,@patrolRoute)`);
         const insertMany = db.transaction((sites) => {
@@ -80,7 +84,7 @@ export async function seedDatabase() {
       
       // Seed guards with generated passwords if empty
       const guardsCount = db.prepare('SELECT COUNT(*) as c FROM guards').get().c;
-      if (guardsCount === 0 && Array.isArray(parsed.guards)) {
+      if (seedDemo && guardsCount === 0 && Array.isArray(parsed.guards)) {
         // Get default guard password from env or generate one random password for all guards
         const defaultGuardPassword = process.env.DEFAULT_GUARD_PASSWORD || generateSecurePassword();
         if (isInitialSeed && !process.env.DEFAULT_GUARD_PASSWORD) {
@@ -174,7 +178,15 @@ export async function seedDatabase() {
           @id, @name, @email, @password, @phone, @employeeId, @role, @assignedArea, @status, @createdAt
         )`);
         
-        for (const s of parsed.staff) {
+        // Clean start: only the first admin, with the email from ADMIN_EMAIL if one is set
+        const staffToSeed = seedDemo
+          ? parsed.staff
+          : parsed.staff
+              .filter((member) => member.role === 'admin')
+              .slice(0, 1)
+              .map((member) => ({ ...member, name: 'Administrator', email: process.env.ADMIN_EMAIL || member.email }));
+
+        for (const s of staffToSeed) {
           let plainPassword = s.password;
           
           // Generate password from env var or random
@@ -212,7 +224,7 @@ export async function seedDatabase() {
             createdAt: s.createdAt || new Date().toISOString(),
           });
         }
-        logger.info({ count: parsed.staff.length }, 'Seeded staff with hashed passwords');
+        logger.info({ count: staffToSeed.length, demo: seedDemo }, 'Seeded staff with hashed passwords');
       }
       
       // Print generated credentials if this was initial seed

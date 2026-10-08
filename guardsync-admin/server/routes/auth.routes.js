@@ -1,16 +1,23 @@
 import express from 'express';
 import db, { siteRowToObj } from '../db.js';
-import { signToken, comparePassword } from '../auth.js';
+import { signToken, comparePassword, authMiddleware } from '../auth.js';
 import { validate } from '../validation/index.js';
 import { loginSchema, faceLoginSchema } from '../validation/auth.schemas.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { decrypt } from '../encryption.js';
-import { success, unauthorized, badRequest, serverError } from '../utils/responses.js';
+import { success, unauthorized, forbidden, badRequest, serverError } from '../utils/responses.js';
 
 const router = express.Router();
 
-// Helper to transform guard row with business logic (decryption, masking, parsing)
-const guardRowToObj = (row) => {
+// Helper to transform guard row with business logic (decryption, masking, parsing).
+// `viewer` is the logged-in user ({ id, role }). What comes back depends on who is asking:
+//   admin        - full ID and bank details (needed to edit them)
+//   the guard    - their own record, with ID and bank numbers masked, plus their face template
+//   anyone else  - masked ID, no bank details, no face template
+// With no viewer the most restricted view is returned.
+const guardRowToObj = (row, viewer = null) => {
+  const isAdmin = viewer?.role === 'admin';
+  const isSelf = viewer?.role === 'guard' && viewer.id === row.id;
   // Decrypt PII fields (these are encrypted at rest in the database)
   const decryptedAadhar = decrypt(row.aadharNumber);
   const decryptedPan = decrypt(row.panNumber);
@@ -22,7 +29,7 @@ const guardRowToObj = (row) => {
   const decryptedEmergencyContact = decrypt(row.emergencyContact);
   
   // Remove sensitive fields from the row
-  const { password, ...rowWithoutPassword } = row;
+  const { password, faceDescriptor, ...rowWithoutPassword } = row;
   
   return {
     ...rowWithoutPassword,
@@ -37,8 +44,8 @@ const guardRowToObj = (row) => {
     emergencyContact: decryptedEmergencyContact || null,
     // Aadhar is protected under India's Aadhaar Act - mask for security
     aadharNumber: decryptedAadhar ? `XXXX-XXXX-${decryptedAadhar.slice(-4)}` : null,
-    aadharNumberFull: decryptedAadhar || null,
-    panNumber: decryptedPan || null,
+    aadharNumberFull: isAdmin ? decryptedAadhar || null : null,
+    panNumber: decryptedPan ? (isAdmin || isSelf ? decryptedPan : `XXXXXX${decryptedPan.slice(-4)}`) : null,
     // Create nested document object
     documents: {
       photographUrl: row.photographUrl || null,
@@ -47,16 +54,19 @@ const guardRowToObj = (row) => {
       relievingLetterUrl: row.relievingLetterUrl || null,
     },
     // Bank details (decrypted with account masking)
-    bankDetails: decryptedBankAccount ? {
+    bankDetails: decryptedBankAccount && (isAdmin || isSelf) ? {
       accountNumber: `XXXXXX${decryptedBankAccount.slice(-4)}`,
       ifsc: decryptedBankIfsc,
       bankName: decryptedBankName,
       accountHolderName: decryptedAccountHolder,
     } : null,
-    bankAccountNumber: decryptedBankAccount || null,
-    bankIfsc: decryptedBankIfsc || null,
-    bankName: decryptedBankName || null,
-    accountHolderName: decryptedAccountHolder || null,
+    bankAccountNumber: isAdmin ? decryptedBankAccount || null : null,
+    bankIfsc: isAdmin || isSelf ? decryptedBankIfsc || null : null,
+    bankName: isAdmin || isSelf ? decryptedBankName || null : null,
+    accountHolderName: isAdmin || isSelf ? decryptedAccountHolder || null : null,
+    // The face template itself only ever goes back to the guard it belongs to
+    faceEnrolled: !!faceDescriptor,
+    ...(isSelf ? { faceDescriptor: faceDescriptor || null } : {}),
   };
 };
 
@@ -74,6 +84,10 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     if (!ok) {
       return unauthorized(res, 'Invalid email or password');
     }
+    // Anyone can submit an enrolment. It is not an account until an admin approves it.
+    if (guard.status === 'pending') {
+      return forbidden(res, 'Your enrolment is waiting for approval. You can log in once an admin approves it.');
+    }
 
     let site = null;
     if (guard.siteId) {
@@ -83,14 +97,14 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
 
     const token = signToken({ id: guard.id, role: 'guard' });
 
-    return success(res, { token, role: 'guard', guard: guardRowToObj(guard), site });
+    return success(res, { token, role: 'guard', guard: guardRowToObj(guard, { id: guard.id, role: 'guard' }), site });
   } catch (err) {
     return serverError(res, String(err));
   }
 });
 
 // GET /api/auth/face-descriptors - Get all guards with face descriptors for facial recognition login
-router.get('/face-descriptors', (req, res) => {
+router.get('/face-descriptors', authMiddleware(true, ['admin']), (req, res) => {
   try {
     const rows = db.prepare('SELECT id, name, faceDescriptor FROM guards WHERE faceDescriptor IS NOT NULL').all();
     return success(res, rows.map(row => ({
@@ -103,12 +117,34 @@ router.get('/face-descriptors', (req, res) => {
   }
 });
 
-// POST /api/auth/face-login - Login with face descriptor (guard ID from face match)
+// Face match strictness: distance between two face templates below this counts as the same person
+const FACE_MATCH_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.5);
+
+const parseDescriptor = (value) => {
+  try {
+    const arr = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!Array.isArray(arr) || arr.length !== 128 || !arr.every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
+    return arr;
+  } catch {
+    return null;
+  }
+};
+
+const faceDistance = (a, b) => Math.sqrt(a.reduce((sum, v, i) => sum + (v - b[i]) ** 2, 0));
+
+// POST /api/auth/face-login - Login with a face.
+// The app sends the guard id and the face template it just captured. The comparison with the
+// enrolled template happens here on the server, so a guard id on its own cannot log anyone in.
 router.post('/face-login', authLimiter, validate(faceLoginSchema), (req, res) => {
-  const { guardId } = req.body;
+  const guardId = req.body.guardId ?? req.body.guard_id;
+  const presented = parseDescriptor(req.body.descriptor);
   try {
     const guard = db.prepare('SELECT * FROM guards WHERE id = ?').get(guardId);
-    if (!guard) return unauthorized(res, 'Guard not found');
+    const enrolled = guard ? parseDescriptor(guard.faceDescriptor) : null;
+    // One generic answer for every failure, so the route cannot be used to probe for guard ids
+    if (!guard || !enrolled || !presented || guard.status === 'pending' || faceDistance(presented, enrolled) >= FACE_MATCH_THRESHOLD) {
+      return unauthorized(res, 'Face not recognised');
+    }
 
     let site = null;
     if (guard.siteId) {
@@ -118,7 +154,7 @@ router.post('/face-login', authLimiter, validate(faceLoginSchema), (req, res) =>
 
     const token = signToken({ id: guard.id, role: 'guard' });
 
-    return success(res, { token, role: 'guard', guard: guardRowToObj(guard), site });
+    return success(res, { token, role: 'guard', guard: guardRowToObj(guard, { id: guard.id, role: 'guard' }), site });
   } catch (err) {
     return serverError(res, String(err));
   }

@@ -2,6 +2,7 @@ import express from 'express';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { authMiddleware } from '../auth.js';
+import { ownParam, ownsRow } from '../middleware/access.js';
 import { validate } from '../validation/index.js';
 import { createNotificationSchema } from '../validation/notification.schemas.js';
 import { success, created, error, badRequest, notFound, unauthorized, forbidden, conflict, serverError, noContent } from '../utils/responses.js';
@@ -9,7 +10,7 @@ import { success, created, error, badRequest, notFound, unauthorized, forbidden,
 const router = express.Router();
 
 // GET /api/notifications/:guardId - Get notifications for a guard
-router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('guardId'), (req, res) => {
   try {
     const rows = db.prepare(`
       SELECT * FROM guard_notifications 
@@ -47,7 +48,7 @@ router.post('/', authMiddleware(true, ['staff', 'admin']), validate(createNotifi
 });
 
 // PUT /api/notifications/:id/read - Mark notification as read
-router.put('/:id/read', authMiddleware(true, ['guard', 'admin']), (req, res) => {
+router.put('/:id/read', authMiddleware(true, ['guard', 'admin']), ownsRow('guard_notifications'), (req, res) => {
   try {
     db.prepare('UPDATE guard_notifications SET isRead = 1 WHERE id = ?').run(req.params.id);
     return success(res, { ok: true }, 200, 'Notification marked as read');
@@ -57,7 +58,7 @@ router.put('/:id/read', authMiddleware(true, ['guard', 'admin']), (req, res) => 
 });
 
 // PUT /api/notifications/:guardId/read-all - Mark all notifications as read
-router.put('/:guardId/read-all', authMiddleware(true, ['guard', 'admin']), (req, res) => {
+router.put('/:guardId/read-all', authMiddleware(true, ['guard', 'admin']), ownParam('guardId'), (req, res) => {
   try {
     db.prepare('UPDATE guard_notifications SET isRead = 1 WHERE guardId = ?').run(req.params.guardId);
     return success(res, { ok: true }, 200, 'All notifications marked as read');

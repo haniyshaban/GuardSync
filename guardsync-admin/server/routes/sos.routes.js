@@ -2,6 +2,7 @@ import express from 'express';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { authMiddleware } from '../auth.js';
+import { actAsSelf, isGuard, ownsRow } from '../middleware/access.js';
 import { validate, validateQuery } from '../validation/index.js';
 import { createSOSAlertSchema, resolveSOSAlertSchema, sosQuerySchema } from '../validation/sos.schemas.js';
 import { success, created, error, badRequest, notFound, unauthorized, forbidden, conflict, serverError, noContent } from '../utils/responses.js';
@@ -24,6 +25,8 @@ router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), validateQuery
     } else {
       rows = db.prepare('SELECT * FROM sos_alerts ORDER BY createdAt DESC').all();
     }
+    // A guard only sees the alerts they raised
+    if (isGuard(req)) rows = rows.filter((row) => row.guardId === req.user.id);
     return success(res, rows.map(sosAlertRowToObj));
   } catch (err) {
     return serverError(res, String(err));
@@ -31,7 +34,7 @@ router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), validateQuery
 });
 
 // GET /api/sos-alerts/:id - Get a specific SOS alert
-router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), ownsRow('sos_alerts'), (req, res) => {
   try {
     const row = db.prepare('SELECT * FROM sos_alerts WHERE id = ?').get(req.params.id);
     if (!row) return notFound(res, 'SOS alert', req.params.id);
@@ -42,7 +45,7 @@ router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res)
 });
 
 // POST /api/sos-alerts - Create a new SOS alert
-router.post('/', authMiddleware(true, ['guard', 'admin']), validate(createSOSAlertSchema), (req, res) => {
+router.post('/', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(createSOSAlertSchema), (req, res) => {
   try {
     const { guardId, guardName, siteId, siteName, lat, lng, message } = req.body;
     const id = randomUUID();

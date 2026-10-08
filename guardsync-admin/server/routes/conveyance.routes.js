@@ -2,6 +2,7 @@ import express from 'express';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { authMiddleware } from '../auth.js';
+import { actAsSelf, ownParam, ownsRow } from '../middleware/access.js';
 import { validate } from '../validation/index.js';
 import { conveyanceRequestSchema, conveyanceResponseSchema } from '../validation/conveyance.schemas.js';
 import { success, created, badRequest, notFound, serverError } from '../utils/responses.js';
@@ -17,7 +18,7 @@ const conveyanceRowToObj = (row) => ({
 });
 
 // POST /api/conveyance/request - Guard submits a conveyance request
-router.post('/request', authMiddleware(true, ['guard', 'admin']), validate(conveyanceRequestSchema), (req, res) => {
+router.post('/request', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(conveyanceRequestSchema), (req, res) => {
   const { guardId, siteId, reason, estimatedDuration, currentLocation } = req.body;
 
   // Get guard and site details
@@ -74,7 +75,7 @@ router.get('/pending', authMiddleware(true, ['staff', 'admin']), (req, res) => {
 });
 
 // GET /api/conveyance/status/:guardId - Get current conveyance request status for a guard
-router.get('/status/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/status/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('guardId'), (req, res) => {
   try {
     // Get the most recent request (pending or approved within last 2 hours)
     const row = db.prepare(`
@@ -118,7 +119,7 @@ router.put('/:id/respond', authMiddleware(true, ['staff', 'admin']), validate(co
 });
 
 // DELETE /api/conveyance/:id - Guard cancels a pending request
-router.delete('/:id', authMiddleware(true, ['guard', 'admin']), (req, res) => {
+router.delete('/:id', authMiddleware(true, ['guard', 'admin']), ownsRow('conveyance_requests'), (req, res) => {
   try {
     const row = db.prepare('SELECT * FROM conveyance_requests WHERE id = ?').get(req.params.id);
     if (!row) {
@@ -136,7 +137,7 @@ router.delete('/:id', authMiddleware(true, ['guard', 'admin']), (req, res) => {
 });
 
 // GET /api/conveyance/history/:guardId - Get conveyance request history for a guard
-router.get('/history/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/history/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('guardId'), (req, res) => {
   try {
     const rows = db.prepare('SELECT * FROM conveyance_requests WHERE guardId = ? ORDER BY requestedAt DESC LIMIT 50').all(req.params.guardId);
     return success(res, rows.map(conveyanceRowToObj));

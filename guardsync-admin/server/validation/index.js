@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { snakeToCamel } from '../utils/caseConverter.js';
 
 /**
  * Validation middleware factory
@@ -7,7 +8,13 @@ import { z } from 'zod';
  */
 export function validate(schema) {
   return (req, res, next) => {
-    const result = schema.safeParse(req.body);
+    // Request bodies are converted to snake_case before they get here. Some schemas are
+    // written in snake_case and some in camelCase, so try the body both ways.
+    let result = schema.safeParse(req.body);
+    if (!result.success) {
+      const camel = schema.safeParse(snakeToCamel(req.body));
+      if (camel.success) result = camel;
+    }
     if (!result.success) {
       return res.status(400).json({
         success: false,

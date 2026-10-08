@@ -6,6 +6,7 @@ import { guardRowToObj } from './auth.routes.js';
 import { encrypt } from '../encryption.js';
 import { randomUUID } from 'crypto';
 import { guardRepo } from '../repositories/index.js';
+import { ownParam } from '../middleware/access.js';
 import db from '../db.js'; // Still needed for complex operations not yet migrated
 import { success, created, error, badRequest, notFound, conflict, forbidden, serverError } from '../utils/responses.js';
 import logger from '../logger.js';
@@ -102,7 +103,7 @@ router.post('/enroll', validate(enrollGuardSchema), async (req, res) => {
     
     logger.info({ guardId: id, employeeId, email, name: full_name }, 'New guard enrolled');
     
-    return created(res, { guard: guardRowToObj(row) }, 'Guard enrolled successfully');
+    return created(res, { guard: guardRowToObj(row, { id: row.id, role: 'guard' }) }, 'Guard enrolled successfully');
   } catch (err) {
     logger.error({ err }, 'Guard enrollment failed');
     return serverError(res, String(err));
@@ -110,11 +111,11 @@ router.post('/enroll', validate(enrollGuardSchema), async (req, res) => {
 });
 
 // GET /api/guards - Get all guards
-router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/', authMiddleware(true, ['staff', 'admin']), (req, res) => {
   try {
     const rows = guardRepo.findAll('id');
     logger.debug({ count: rows.length }, 'Fetching all guards');
-    const mapped = rows.map(guardRowToObj);
+    const mapped = rows.map((row) => guardRowToObj(row, req.user));
     return success(res, mapped);
   } catch (err) {
     logger.error({ err }, 'Failed to fetch guards');
@@ -123,11 +124,11 @@ router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) =>
 });
 
 // GET /api/guards/:id - Get single guard by ID
-router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('id'), (req, res) => {
   try {
     const row = guardRepo.findById(req.params.id);
     if (!row) return notFound(res, 'guard', req.params.id);
-    return success(res, guardRowToObj(row));
+    return success(res, guardRowToObj(row, req.user));
   } catch (err) {
     return serverError(res, String(err));
   }
@@ -216,7 +217,7 @@ router.put('/:id', authMiddleware(true, ['staff', 'admin']), validate(updateGuar
     transaction();
     
     const row = db.prepare('SELECT * FROM guards WHERE id = ?').get(req.params.id);
-    return success(res, guardRowToObj(row));
+    return success(res, guardRowToObj(row, req.user));
   } catch (err) {
     return serverError(res, String(err));
   }
@@ -288,7 +289,7 @@ router.post('/:id/approve', authMiddleware(true, ['admin']), (req, res) => {
     
     logger.info({ guardId: req.params.id, name: row.name, status: newStatus }, 'Guard approved');
     
-    return success(res, { guard: guardRowToObj(updatedRow) }, 200, 'Guard enrollment approved successfully');
+    return success(res, { guard: guardRowToObj(updatedRow, req.user) }, 200, 'Guard enrollment approved successfully');
   } catch (err) {
     logger.error({ err, guardId: req.params.id }, 'Failed to approve guard');
     return serverError(res, String(err));
@@ -326,44 +327,26 @@ router.post('/:id/reject', authMiddleware(true, ['admin']), validate(rejectGuard
 });
 
 // PUT /api/guards/:id/profile - Update guard profile/personal details
-router.put('/:id/profile', authMiddleware(true, ['guard', 'staff', 'admin']), validate(updateGuardProfileSchema), (req, res) => {
+router.put('/:id/profile', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('id'), validate(updateGuardProfileSchema), (req, res) => {
   const g = req.body;
   try {
-    // Encrypt PII fields before storing (Aadhar is protected under India's Aadhaar Act)
-    const encryptedAadhar = g.aadharNumber ? encrypt(g.aadharNumber) : null;
-    const encryptedPan = g.panNumber ? encrypt(g.panNumber) : null;
-    const encryptedBankAccount = g.bankAccountNumber ? encrypt(g.bankAccountNumber) : null;
-    const encryptedBankIfsc = g.bankIfsc ? encrypt(g.bankIfsc) : null;
-    const encryptedBankName = g.bankName ? encrypt(g.bankName) : null;
-    const encryptedAccountHolder = g.accountHolderName ? encrypt(g.accountHolderName) : null;
-    const encryptedAddress = g.address ? encrypt(g.address) : null;
-    const encryptedEmergencyContact = g.emergencyContact ? encrypt(g.emergencyContact) : null;
-    
-    const update = db.prepare(`UPDATE guards SET 
-      address = @address,
-      emergencyContact = @emergencyContact,
-      aadharNumber = @aadharNumber,
-      panNumber = @panNumber,
-      bankAccountNumber = @bankAccountNumber,
-      bankIfsc = @bankIfsc,
-      bankName = @bankName,
-      accountHolderName = @accountHolderName,
-      faceDescriptor = @faceDescriptor
-      WHERE id = @id`);
-    update.run({
-      id: req.params.id,
-      address: encryptedAddress,
-      emergencyContact: encryptedEmergencyContact,
-      aadharNumber: encryptedAadhar,
-      panNumber: encryptedPan,
-      bankAccountNumber: encryptedBankAccount,
-      bankIfsc: encryptedBankIfsc,
-      bankName: encryptedBankName,
-      accountHolderName: encryptedAccountHolder,
-      faceDescriptor: g.faceDescriptor || null,
-    });
+    // Only the fields that were actually sent are changed; everything else is left as it is.
+    // PII is encrypted before storing (Aadhaar is protected under India's Aadhaar Act).
+    // The face template is not accepted here: it has its own route (PUT /:id/face) with its own rules.
+    const fields = ['address', 'emergencyContact', 'aadharNumber', 'panNumber', 'bankAccountNumber', 'bankIfsc', 'bankName', 'accountHolderName'];
+    const snake = (k) => k.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase());
+    const changes = {};
+    for (const field of fields) {
+      const value = g[field] ?? g[snake(field)];
+      if (value !== undefined && value !== null && value !== '') changes[field] = encrypt(String(value));
+    }
+    if (!db.prepare('SELECT id FROM guards WHERE id = ?').get(req.params.id)) return notFound(res, 'guard', req.params.id);
+    if (Object.keys(changes).length > 0) {
+      const sets = Object.keys(changes).map((field) => `${field} = @${field}`).join(', ');
+      db.prepare(`UPDATE guards SET ${sets} WHERE id = @id`).run({ ...changes, id: req.params.id });
+    }
     const row = db.prepare('SELECT * FROM guards WHERE id = ?').get(req.params.id);
-    return success(res, guardRowToObj(row));
+    return success(res, guardRowToObj(row, req.user));
   } catch (err) {
     return serverError(res, String(err));
   }
@@ -397,7 +380,7 @@ router.put('/:id/face', authMiddleware(true, ['guard', 'staff', 'admin']), (req,
 });
 
 // PUT /api/guards/:id/location - Update guard's current location
-router.put('/:id/location', authMiddleware(true, ['guard', 'admin']), validate(updateGuardLocationSchema), (req, res) => {
+router.put('/:id/location', authMiddleware(true, ['guard', 'admin']), ownParam('id'), validate(updateGuardLocationSchema), (req, res) => {
   try {
     const { lat, lng } = req.body;
     const guardId = req.params.id;

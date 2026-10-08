@@ -2,6 +2,7 @@ import express from 'express';
 import { randomUUID } from 'crypto';
 import db from '../db.js';
 import { authMiddleware } from '../auth.js';
+import { ownParam } from '../middleware/access.js';
 import { validate, validateQuery } from '../validation/index.js';
 import { createScheduleSchema, updateScheduleSchema, scheduleQuerySchema } from '../validation/schedule.schemas.js';
 import { success, created, error, badRequest, notFound, unauthorized, forbidden, conflict, serverError, noContent } from '../utils/responses.js';
@@ -9,7 +10,7 @@ import { success, created, error, badRequest, notFound, unauthorized, forbidden,
 const router = express.Router();
 
 // GET /api/schedules/:guardId - Get schedules for a guard
-router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), validateQuery(scheduleQuerySchema), (req, res) => {
+router.get('/:guardId', authMiddleware(true, ['guard', 'staff', 'admin']), ownParam('guardId'), validateQuery(scheduleQuerySchema), (req, res) => {
   try {
     const { from, to } = req.query;
     let query = 'SELECT * FROM guard_schedules WHERE guardId = ?';

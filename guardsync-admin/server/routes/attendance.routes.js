@@ -1,5 +1,6 @@
 import express from 'express';
 import { authMiddleware } from '../auth.js';
+import { actAsSelf, scopeQueryToSelf } from '../middleware/access.js';
 import { validate, validateQuery } from '../validation/index.js';
 import { clockInSchema, clockOutSchema, attendanceQuerySchema } from '../validation/attendance.schemas.js';
 import { attendanceRepo, guardRepo } from '../repositories/index.js';
@@ -9,7 +10,7 @@ const router = express.Router();
 
 // GET /api/attendance - Get guard attendance records with optional filters
 // Consolidated route supporting multiple query parameter formats
-router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), validateQuery(attendanceQuerySchema), (req, res) => {
+router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), scopeQueryToSelf, validateQuery(attendanceQuerySchema), (req, res) => {
   try {
     const { from, to, site_id, guard_id, date, start_date, end_date } = req.query;
     
@@ -50,7 +51,7 @@ router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), validateQuery
 });
 
 // POST /api/attendance/clock-in - Guard clock in
-router.post('/clock-in', authMiddleware(true, ['guard', 'admin']), validate(clockInSchema), (req, res) => {
+router.post('/clock-in', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(clockInSchema), (req, res) => {
   try {
     const { guard_id, site_id, lat, lng, within_geofence } = req.body;
     const clockIn = new Date().toISOString();
@@ -69,7 +70,7 @@ router.post('/clock-in', authMiddleware(true, ['guard', 'admin']), validate(cloc
 });
 
 // POST /api/attendance/clock-out - Guard clock out
-router.post('/clock-out', authMiddleware(true, ['guard', 'admin']), validate(clockOutSchema), (req, res) => {
+router.post('/clock-out', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(clockOutSchema), (req, res) => {
   try {
     const { guard_id } = req.body;
     const clockOut = new Date().toISOString();
