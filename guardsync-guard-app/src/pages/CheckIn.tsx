@@ -76,6 +76,7 @@ export default function CheckIn() {
           latitude: lat,
           longitude: lng,
           withinGeofence,
+          faceDescriptor: descriptor ? descriptorToString(descriptor) : undefined,
         });
 
         if (!response.success) {

@@ -8,6 +8,8 @@ export const clockInSchema = z.object({
   lat: commonSchemas.latitude.optional(),
   lng: commonSchemas.longitude.optional(),
   within_geofence: z.boolean().optional(),
+  // The face template captured at check-in (128 numbers, or the same as a JSON string)
+  face_descriptor: z.union([z.string().max(20000), z.array(z.number()).length(128)]).optional().nullable(),
 });
 
 // Clock-out schema

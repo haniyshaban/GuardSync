@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import logger from './logger.js';
+import db from './db.js';
 
 // JWT Secret Configuration
 // In production: MUST be set via environment variable
@@ -38,6 +39,21 @@ export function verifyToken(token) {
   return jwt.verify(token, JWT_SECRET);
 }
 
+/**
+ * A token is only as good as the account behind it. This is what makes it possible to cut off
+ * a dismissed guard or a lost phone: remove or deactivate the account and its logins stop working.
+ */
+function accountIsActive(decoded) {
+  if (decoded.role === 'guard') {
+    const guard = db.prepare('SELECT status FROM guards WHERE id = ?').get(decoded.id);
+    return !!guard && guard.status !== 'pending';
+  }
+  // For staff, status is normally their duty status (on_duty, offline). The account is cut off
+  // when it is deleted, or when status is set to one of the values below.
+  const staff = db.prepare('SELECT status FROM staff WHERE id = ?').get(decoded.id);
+  return !!staff && !['disabled', 'inactive', 'suspended'].includes(staff.status);
+}
+
 export function authMiddleware(required = true, roles = []) {
   return (req, res, next) => {
     const auth = req.headers.authorization || '';
@@ -50,6 +66,9 @@ export function authMiddleware(required = true, roles = []) {
 
     try {
       const decoded = verifyToken(token);
+      if (!accountIsActive(decoded)) {
+        return res.status(401).json({ error: 'Account is no longer active' });
+      }
       req.user = decoded;
       if (roles.length && !roles.includes(decoded.role)) {
         return res.status(403).json({ error: 'Forbidden' });
@@ -72,7 +91,9 @@ export async function comparePassword(plain, hashedOrPlainFromDb, onPlainMatchRe
   if (looksHashed) {
     return bcrypt.compare(plain, hashedOrPlainFromDb);
   }
-  // Backward-compat: match plaintext and optionally rehash
+  // Old databases may hold plain-text passwords. They are refused unless this is switched on
+  // for a one-time migration (each one is re-hashed the first time its owner logs in).
+  if (process.env.ALLOW_LEGACY_PLAINTEXT_PASSWORDS !== 'true') return false;
   const match = plain === hashedOrPlainFromDb;
   if (match && typeof onPlainMatchRehash === 'function') {
     try {

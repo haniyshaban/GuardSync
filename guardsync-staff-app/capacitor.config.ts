@@ -16,7 +16,9 @@ const config: CapacitorConfig = {
     // For real device on same network: use http://<YOUR_IP>:4000
     // For production: use https://api.yourserver.com
     url: serverUrl,
-    cleartext: true, // Allow HTTP in development (disable in production)
+    // Plain HTTP is only allowed when the app is built against a plain-HTTP address (local testing).
+    // A build pointed at an https:// server refuses unencrypted traffic.
+    cleartext: !serverUrl.startsWith('https://'),
   },
 };
 

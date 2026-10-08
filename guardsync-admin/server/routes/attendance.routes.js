@@ -4,6 +4,7 @@ import { actAsSelf, scopeQueryToSelf } from '../middleware/access.js';
 import { validate, validateQuery } from '../validation/index.js';
 import { clockInSchema, clockOutSchema, attendanceQuerySchema } from '../validation/attendance.schemas.js';
 import { attendanceRepo, guardRepo } from '../repositories/index.js';
+import { facesMatch } from '../utils/face.js';
 import { success, created, error, badRequest, notFound, unauthorized, forbidden, conflict, serverError, noContent } from '../utils/responses.js';
 
 const router = express.Router();
@@ -53,7 +54,17 @@ router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), scopeQueryToS
 // POST /api/attendance/clock-in - Guard clock in
 router.post('/clock-in', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(clockInSchema), (req, res) => {
   try {
-    const { guard_id, site_id, lat, lng, within_geofence } = req.body;
+    const { guard_id, site_id, lat, lng, within_geofence, face_descriptor } = req.body;
+
+    // A guard with an enrolled face must present a matching one. The comparison happens here,
+    // so a modified app cannot skip it. (An admin clocking a guard in is not face-checked.)
+    if (req.user?.role === 'guard') {
+      const guard = guardRepo.findById(guard_id);
+      if (guard?.faceDescriptor && !facesMatch(face_descriptor, guard.faceDescriptor)) {
+        return forbidden(res, 'Face check failed. Please scan your face again.');
+      }
+    }
+
     const clockIn = new Date().toISOString();
     const date = clockIn.slice(0, 10);
 

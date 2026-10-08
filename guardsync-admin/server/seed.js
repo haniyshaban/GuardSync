@@ -23,25 +23,6 @@ function generateSecurePassword(length = 16) {
   return password;
 }
 
-// Print credentials banner
-function printCredentialsBanner(title, email, password) {
-  const border = '═'.repeat(50);
-  const banner = [
-    `\n╔${border}╗`,
-    `║${' '.repeat(50)}║`,
-    `║  ${title.padEnd(46)}  ║`,
-    `║${' '.repeat(50)}║`,
-    `║  Email: ${email.padEnd(40)}║`,
-    `║  Password: ${password.padEnd(36)}║`,
-    `║${' '.repeat(50)}║`,
-    `║  ⚠️  SAVE THESE CREDENTIALS - SHOWN ONLY ONCE  ║`,
-    `║  ⚠️  Change password after first login         ║`,
-    `║${' '.repeat(50)}║`,
-    `╚${border}╝\n`
-  ].join('\n');
-  logger.info(banner);
-}
-
 export async function seedDatabase() {
   try {
     const raw = fs.readFileSync(INITIAL_JSON, 'utf-8');
@@ -229,14 +210,17 @@ export async function seedDatabase() {
       
       // Print generated credentials if this was initial seed
       if (isInitialSeed && generatedCredentials.length > 0) {
-        logger.info('\n' + '='.repeat(60));
-        logger.info('  🔐 INITIAL CREDENTIALS GENERATED');
-        logger.info('='.repeat(60));
-        generatedCredentials.forEach(cred => {
-          printCredentialsBanner(cred.title, cred.email, cred.password);
-        });
-        logger.warn('⚠️  These credentials will NOT be shown again!');
-        logger.warn('⚠️  Save them securely and change after first login.\n');
+        // Logs get copied, shipped and kept, so passwords are written to a local file instead
+        const file = path.join(__dirname, 'data', 'initial-credentials.txt');
+        const lines = [
+          'GuardSync - first-time logins',
+          'Created ' + new Date().toISOString(),
+          'Log in, change these passwords, then delete this file.',
+          '',
+          ...generatedCredentials.flatMap((cred) => [cred.title, '  Email:    ' + cred.email, '  Password: ' + cred.password, '']),
+        ];
+        fs.writeFileSync(file, lines.join('\n'), { mode: 0o600 });
+        logger.warn({ file, accounts: generatedCredentials.length }, 'First-time logins were written to a file. Read it, change the passwords, then delete it.');
       }
   } catch (err) {
     logger.error({ err }, 'Failed to seed database');

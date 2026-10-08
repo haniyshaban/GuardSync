@@ -96,6 +96,8 @@ export const clockIn = async (
     longitude?: number;
     withinGeofence: boolean;
     selfieUrl?: string;
+    /** The face template from the scan; the server checks it against the enrolled one */
+    faceDescriptor?: string;
   }
 ): Promise<ApiResponse<AttendanceLog>> => {
   // The API expects siteId, lat and lng (see clockInSchema on the server)
@@ -105,6 +107,7 @@ export const clockIn = async (
     lat: data.latitude,
     lng: data.longitude,
     withinGeofence: data.withinGeofence,
+    faceDescriptor: data.faceDescriptor,
   });
 };
 
@@ -171,16 +174,18 @@ export const logPatrolPoint = async (
     distanceFromPoint?: number;
   }
 ): Promise<ApiResponse<PatrolLog>> => {
-  return api.post('/patrol/log', { guardId, ...data });
+  const { latitude, longitude, ...rest } = data;
+  return api.post('/patrol-logs', { guardId, ...rest, lat: latitude, lng: longitude });
 };
 
 export const getPatrolLogs = async (
   guardId: string,
   shiftId?: string
 ): Promise<ApiResponse<PatrolLog[]>> => {
-  const params = new URLSearchParams({ guardId });
+  const params = new URLSearchParams();
   if (shiftId) params.append('shiftId', shiftId);
-  return api.get(`/patrol/logs?${params}`);
+  const query = params.toString();
+  return api.get(`/patrol-logs/${guardId}${query ? `?${query}` : ''}`);
 };
 
 // ============ Wake Alerts ============

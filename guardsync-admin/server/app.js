@@ -31,7 +31,18 @@ app.use(requestLogger);
 
 // Security and middleware
 app.use(helmet());
-app.use(cors());
+// Which websites may call this API from a browser.
+// Production: only the addresses listed in CORS_ORIGINS (comma separated), plus the mobile apps.
+// Development: any address, so local tools keep working.
+const MOBILE_APP_ORIGINS = ['capacitor://localhost', 'https://localhost', 'http://localhost'];
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map((o) => o.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, callback) {
+    // No Origin header means it is not a browser page on another site (mobile app, server, curl)
+    if (!origin || process.env.NODE_ENV !== 'production') return callback(null, true);
+    return callback(null, allowedOrigins.includes(origin) || MOBILE_APP_ORIGINS.includes(origin));
+  },
+}));
 app.use(express.json());
 
 // Case converter middleware - automatically converts between camelCase and snake_case

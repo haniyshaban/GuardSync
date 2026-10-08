@@ -1,3 +1,4 @@
+import logger from '../logger.js';
 /**
  * Standard API response utilities for consistent error and success responses
  * 
@@ -104,7 +105,11 @@ export function forbidden(res, message = 'Forbidden') {
  * @param {string} message - Error message
  */
 export function serverError(res, message = 'Internal server error') {
-  return error(res, 500, 'INTERNAL_ERROR', message);
+  // The real error goes to the server log. Outside development the caller only gets a generic
+  // message, so internal details (file paths, SQL, library names) are not handed to an attacker.
+  logger.error({ detail: String(message) }, 'Request failed with a server error');
+  const shown = process.env.NODE_ENV === 'development' ? message : 'Something went wrong. Please try again.';
+  return error(res, 500, 'INTERNAL_ERROR', shown);
 }
 
 /**

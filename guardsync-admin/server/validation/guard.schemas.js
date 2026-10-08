@@ -15,7 +15,7 @@ export const enrollGuardSchema = z.object({
   bank_name: z.string().max(100).optional().nullable(),
   account_holder_name: z.string().max(100).optional().nullable(),
   face_descriptor: z.any().optional().nullable(),
-  password: z.string().min(6, 'Password must be at least 6 characters').optional().nullable(),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional().nullable(),
   photograph_url: z.string().url().optional().nullable(),
   aadhar_doc_url: z.string().url().optional().nullable(),
   pan_doc_url: z.string().url().optional().nullable(),

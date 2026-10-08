@@ -5,6 +5,7 @@ import { validate } from '../validation/index.js';
 import { loginSchema, faceLoginSchema } from '../validation/auth.schemas.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { decrypt } from '../encryption.js';
+import { facesMatch } from '../utils/face.js';
 import { success, unauthorized, forbidden, badRequest, serverError } from '../utils/responses.js';
 
 const router = express.Router();
@@ -117,32 +118,15 @@ router.get('/face-descriptors', authMiddleware(true, ['admin']), (req, res) => {
   }
 });
 
-// Face match strictness: distance between two face templates below this counts as the same person
-const FACE_MATCH_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.5);
-
-const parseDescriptor = (value) => {
-  try {
-    const arr = typeof value === 'string' ? JSON.parse(value) : value;
-    if (!Array.isArray(arr) || arr.length !== 128 || !arr.every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
-    return arr;
-  } catch {
-    return null;
-  }
-};
-
-const faceDistance = (a, b) => Math.sqrt(a.reduce((sum, v, i) => sum + (v - b[i]) ** 2, 0));
-
 // POST /api/auth/face-login - Login with a face.
 // The app sends the guard id and the face template it just captured. The comparison with the
 // enrolled template happens here on the server, so a guard id on its own cannot log anyone in.
 router.post('/face-login', authLimiter, validate(faceLoginSchema), (req, res) => {
   const guardId = req.body.guardId ?? req.body.guard_id;
-  const presented = parseDescriptor(req.body.descriptor);
   try {
     const guard = db.prepare('SELECT * FROM guards WHERE id = ?').get(guardId);
-    const enrolled = guard ? parseDescriptor(guard.faceDescriptor) : null;
     // One generic answer for every failure, so the route cannot be used to probe for guard ids
-    if (!guard || !enrolled || !presented || guard.status === 'pending' || faceDistance(presented, enrolled) >= FACE_MATCH_THRESHOLD) {
+    if (!guard || guard.status === 'pending' || !facesMatch(req.body.descriptor, guard.faceDescriptor)) {
       return unauthorized(res, 'Face not recognised');
     }
 

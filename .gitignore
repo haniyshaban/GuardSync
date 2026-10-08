@@ -76,3 +76,6 @@ pnpm-lock.yaml
 # Customer-specific forks (maintained in separate repositories)
 blackbelt-guardsync/
 *-guardsync/
+
+# First-time logins written by the server on first start
+guardsync-admin/server/data/initial-credentials.txt
