@@ -1,93 +1,103 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Eden Labs design system - calm paper and ink, with a sage accent (matches edenlabs.app) */
 @layer base {
   :root {
-    /* Dark command center theme - consistent with admin */
-    --background: 222 47% 6%;
-    --foreground: 210 40% 96%;
+    /* Core palette */
+    --paper: 75 18% 96%;        /* #F5F6F2 page background */
+    --surface: 0 0% 100%;       /* #FFFFFF raised surfaces */
+    --tint: 110 15% 92%;        /* #E9EEE8 soft sage panels */
+    --ink: 120 5% 7%;           /* #121412 text, buttons */
+    --ink-raised: 120 5% 12%;   /* #1D201D hover on ink */
+    --graphite: 103 4% 35%;     /* #575C55 secondary text */
+    --line: 82 11% 86%;         /* #DDE0D8 hairlines */
+    --sage: 141 16% 36%;        /* #4D6A57 accent */
+    --sage-light: 135 16% 71%;  /* #A9C1AF accent on dark */
 
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 96%;
+    --background: var(--paper);
+    --foreground: var(--ink);
 
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 96%;
+    --card: var(--surface);
+    --card-foreground: var(--ink);
 
-    /* Electric cyan primary - same as admin */
-    --primary: 192 95% 50%;
-    --primary-foreground: 222 47% 6%;
-    --primary-glow: 192 95% 60%;
+    --popover: var(--surface);
+    --popover-foreground: var(--ink);
 
-    /* Muted blue-gray - consistent accent */
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 96%;
+    /* Sage is the accent: active states, icons, links. Buttons use ink. */
+    --primary: var(--sage);
+    --primary-foreground: var(--paper);
+    --primary-glow: var(--sage);
 
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 55%;
+    --secondary: var(--tint);
+    --secondary-foreground: var(--ink);
 
-    --accent: 217 33% 20%;
-    --accent-foreground: 210 40% 96%;
+    --muted: 80 12% 91%;
+    --muted-foreground: var(--graphite);
+
+    --accent: var(--tint);
+    --accent-foreground: var(--ink);
 
     /* Alert colors */
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
-    --success-foreground: 210 40% 98%;
+    --success: 142 40% 34%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 6%;
+    --warning: 38 80% 42%;
+    --warning-foreground: 0 0% 100%;
 
-    --info: 199 89% 48%;
-    --info-foreground: 222 47% 6%;
+    --info: 210 45% 40%;
+    --info-foreground: 0 0% 100%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 192 95% 50%;
+    --border: var(--line);
+    --input: var(--line);
+    --ring: var(--sage);
 
-    --radius: 0.5rem;
+    --radius: 0.875rem;
 
-    /* Status colors - consistent with admin */
-    --status-online: 142 76% 46%;
-    --status-offline: 0 72% 51%;
-    --status-idle: 38 92% 50%;
-    --status-alert: 0 84% 60%;
-    --status-panic: 0 85% 50%;
-    --status-pending: 38 92% 50%;
+    /* Status colors */
+    --status-online: 142 45% 38%;
+    --status-offline: 0 65% 48%;
+    --status-idle: 38 85% 45%;
+    --status-alert: 0 70% 52%;
+    --status-panic: 0 80% 46%;
+    --status-pending: 38 85% 45%;
 
     /* Sidebar */
-    --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 210 40% 90%;
-    --sidebar-primary: 192 95% 50%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 217 33% 14%;
-    --sidebar-accent-foreground: 210 40% 96%;
-    --sidebar-border: 217 33% 12%;
-    --sidebar-ring: 192 95% 50%;
+    --sidebar-background: var(--paper);
+    --sidebar-foreground: var(--graphite);
+    --sidebar-primary: var(--sage);
+    --sidebar-primary-foreground: var(--paper);
+    --sidebar-accent: var(--tint);
+    --sidebar-accent-foreground: var(--ink);
+    --sidebar-border: var(--line);
+    --sidebar-ring: var(--sage);
 
-    /* Gradients - consistent with admin */
-    --gradient-primary: linear-gradient(135deg, hsl(192 95% 50%), hsl(199 89% 48%));
-    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(160 84% 39%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(222 47% 8%), hsl(222 47% 4%));
-    --gradient-card: linear-gradient(145deg, hsl(222 47% 10%), hsl(222 47% 6%));
-    --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-    --gradient-glow: radial-gradient(ellipse at center, hsl(192 95% 50% / 0.15), transparent 70%);
+    /* Kept as variables so older markup still renders; all flat now */
+    --gradient-primary: hsl(var(--sage));
+    --gradient-success: hsl(var(--success));
+    --gradient-dark: hsl(var(--paper));
+    --gradient-card: hsl(var(--surface));
+    --gradient-glass: none;
+    --gradient-glow: none;
 
     /* Shadows */
-    --shadow-glow: 0 0 20px hsl(192 95% 50% / 0.3);
-    --shadow-card: 0 4px 24px hsl(222 47% 2% / 0.6);
-    --shadow-elevated: 0 8px 32px hsl(222 47% 2% / 0.8);
+    --shadow-glow: none;
+    --shadow-card: 0 1px 2px hsl(var(--ink) / 0.04);
+    --shadow-elevated: 0 8px 24px hsl(var(--ink) / 0.08);
 
     /* Typography */
-    --font-sans: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
   }
 
   .dark {
-    /* Same as root - dark by default */
+    /* Same as root - one light theme */
   }
 }
 
@@ -96,13 +106,21 @@
     @apply border-border;
   }
 
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground font-sans antialiased;
     font-family: var(--font-sans);
   }
 
-  html {
-    @apply scroll-smooth;
+  h1, h2, h3, h4 {
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: hsl(var(--sage) / 0.2);
   }
 
   /* Custom scrollbar */
@@ -112,7 +130,7 @@
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-muted/30;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
@@ -125,51 +143,48 @@
 }
 
 @layer components {
+  /* Numbers and IDs: same typeface, aligned digits */
   .font-mono {
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Glass card effect */
+  /* Flat surface card (was a glass effect) */
   .glass-card {
-    @apply bg-card/80 backdrop-blur-xl border border-white/10 rounded-lg;
-    background-image: var(--gradient-glass);
+    @apply bg-card border border-border rounded-lg;
   }
 
   /* Card variants */
   .card-elevated {
-    background: var(--gradient-card);
+    background: hsl(var(--surface));
     box-shadow: var(--shadow-card);
-    @apply border border-border/50;
+    @apply border border-border;
   }
 
   .card-glow {
     @apply card-elevated;
-    box-shadow: var(--shadow-glow), var(--shadow-card);
   }
 
-  /* Gradient utilities */
+  /* Flat fills (were gradients) */
   .gradient-primary {
-    background: var(--gradient-primary);
+    background: hsl(var(--sage));
   }
 
   .gradient-success {
-    background: var(--gradient-success);
+    background: hsl(var(--success));
   }
 
-  /* Glow effects */
+  /* Glow effects removed */
   .glow-primary {
-    box-shadow: var(--shadow-glow);
+    box-shadow: none;
   }
 
   .glow-text {
-    text-shadow: 0 0 20px hsl(192 95% 50% / 0.5);
+    text-shadow: none;
   }
 
   .text-gradient {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(var(--ink));
   }
 
   /* Status indicators */
@@ -183,12 +198,10 @@
 
   .status-online {
     @apply bg-[hsl(var(--status-online))];
-    box-shadow: 0 0 8px hsl(var(--status-online) / 0.6);
   }
 
   .status-active {
     @apply bg-[hsl(var(--status-online))];
-    box-shadow: 0 0 8px hsl(var(--status-online) / 0.6);
   }
 
   .status-offline {
@@ -212,8 +225,14 @@
   }
 
   .status-pending {
-    @apply bg-amber-500;
+    @apply bg-[hsl(var(--status-pending))];
     animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Recording indicator */
+  .recording-indicator {
+    @apply bg-destructive;
+    animation: recording-pulse 1s ease-in-out infinite;
   }
 
   /* Animation utilities */
@@ -226,6 +245,58 @@
     @apply absolute inset-0 rounded-full border-2 border-primary;
     animation: pulse-ring 1.5s ease-out infinite;
   }
+
+  /* Map styles */
+  .leaflet-container {
+    @apply bg-background rounded-lg;
+    font-family: var(--font-sans);
+  }
+
+  .leaflet-tile-pane {
+    filter: saturate(0.75);
+  }
+
+  .leaflet-control-zoom {
+    @apply border-none !important;
+  }
+
+  .leaflet-control-zoom a {
+    @apply bg-card text-foreground border-border hover:bg-accent !important;
+  }
+
+  /* Ensure Leaflet map layers and controls sit below modals/dialogs */
+  .leaflet-container,
+  .leaflet-pane,
+  .leaflet-map-pane,
+  .leaflet-tile-pane,
+  .leaflet-overlay-pane,
+  .leaflet-shadow-pane,
+  .leaflet-marker-pane,
+  .leaflet-popup-pane,
+  .leaflet-control {
+    z-index: 0 !important;
+  }
+
+  /* Cursor for placing polygon points: a small map-pin icon as cursor */
+  .cursor-pin {
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z' fill='%23121412'/><circle cx='12' cy='9' r='2.5' fill='%23ffffff'/></svg>") 12 22, pointer;
+  }
+
+  .marker-panic {
+    animation: panic-pulse 0.7s ease-in-out infinite;
+  }
+
+  .animate-ping-slow {
+    animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  /* Grid pattern background */
+  .bg-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
 }
 
 @keyframes pulse {
@@ -234,6 +305,17 @@
   }
   50% {
     opacity: 0.5;
+  }
+}
+
+@keyframes ping-slow {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
   }
 }
 
@@ -280,5 +362,14 @@
   100% {
     transform: scale(1.4);
     opacity: 0;
+  }
+}
+
+@keyframes recording-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }

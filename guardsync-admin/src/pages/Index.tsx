@@ -233,7 +233,7 @@ const Index = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total Guards"
             value={stats.totalGuards}
@@ -242,18 +242,11 @@ const Index = () => {
             to="/guards"
           />
           <StatCard
-            title="Active Now"
+            title="Clocked In"
             value={stats.activeGuards}
             icon={UserCheck}
             variant="success"
             to="/guards?status=online"
-          />
-          <StatCard
-            title="Attrition"
-            value={`${workingToday}/${expectedAssigned} (${attritionPercent}%)`}
-            icon={Users}
-            variant="warning"
-            to="/guards"
           />
           <StatCard
             title="Not On Site"
@@ -266,15 +259,8 @@ const Index = () => {
             title="Offline"
             value={stats.offlineGuards}
             icon={UserX}
-            variant="warning"
-            to="/guards?status=offline"
-          />
-          <StatCard
-            title="Alerts"
-            value={stats.alertGuards}
-            icon={AlertTriangle}
             variant="destructive"
-            to="/alerts"
+            to="/guards?status=offline"
           />
           <StatCard
             title="Total Sites"
@@ -288,6 +274,20 @@ const Index = () => {
             icon={MapPin}
             variant="success"
             to="/sites"
+          />
+          <StatCard
+            title={`Attrition (${attritionPercent}%)`}
+            value={`${workingToday}/${expectedAssigned}`}
+            icon={Users}
+            variant="warning"
+            to="/guards"
+          />
+          <StatCard
+            title="Alerts"
+            value={stats.alertGuards}
+            icon={AlertTriangle}
+            variant="destructive"
+            to="/alerts"
           />
         </div>
 

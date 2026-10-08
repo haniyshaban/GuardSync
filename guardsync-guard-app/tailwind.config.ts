@@ -14,8 +14,12 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['"Hanken Grotesk"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"Hanken Grotesk"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+      fontWeight: {
+        semibold: '500',
+        bold: '600',
       },
       colors: {
         border: "hsl(var(--border))",
@@ -108,8 +112,8 @@ export default {
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--primary) / 0.3)" },
-          "50%": { boxShadow: "0 0 40px hsl(var(--primary) / 0.6)" },
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--primary) / 0.25)" },
+          "50%": { boxShadow: "0 0 0 8px hsl(var(--primary) / 0)" },
         },
       },
       animation: {

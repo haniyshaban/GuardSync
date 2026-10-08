@@ -7,7 +7,7 @@ import { encrypt } from '../encryption.js';
 import { randomUUID } from 'crypto';
 import { guardRepo } from '../repositories/index.js';
 import db from '../db.js'; // Still needed for complex operations not yet migrated
-import { success, created, error, badRequest, notFound, conflict, serverError } from '../utils/responses.js';
+import { success, created, error, badRequest, notFound, conflict, forbidden, serverError } from '../utils/responses.js';
 import logger from '../logger.js';
 
 const router = express.Router();
@@ -365,6 +365,33 @@ router.put('/:id/profile', authMiddleware(true, ['guard', 'staff', 'admin']), va
     const row = db.prepare('SELECT * FROM guards WHERE id = ?').get(req.params.id);
     return success(res, guardRowToObj(row));
   } catch (err) {
+    return serverError(res, String(err));
+  }
+});
+
+// PUT /api/guards/:id/face - Save a guard's face descriptor (first-time enrolment)
+// A guard may enrol their own face once. Replacing an enrolled face needs staff or admin,
+// so one guard cannot re-enrol on another's behalf.
+router.put('/:id/face', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+  try {
+    const descriptor = req.body?.face_descriptor ?? req.body?.faceDescriptor;
+    if (typeof descriptor !== 'string' || descriptor.length < 10 || descriptor.length > 20000) {
+      return badRequest(res, 'A face descriptor is required');
+    }
+
+    const row = db.prepare('SELECT id, faceDescriptor FROM guards WHERE id = ?').get(req.params.id);
+    if (!row) return notFound(res, 'guard', req.params.id);
+
+    if (req.user?.role === 'guard') {
+      if (req.user.id !== req.params.id) return forbidden(res, 'Guards can only enrol their own face');
+      if (row.faceDescriptor) return conflict(res, 'A face is already enrolled. Ask your supervisor to reset it.');
+    }
+
+    guardRepo.updateFaceDescriptor(req.params.id, descriptor);
+    logger.info({ guardId: req.params.id, by: req.user?.role }, 'Guard face descriptor saved');
+    return success(res, { guardId: req.params.id, enrolled: true }, 200, 'Face enrolled');
+  } catch (err) {
+    logger.error({ err, guardId: req.params.id }, 'Failed to save face descriptor');
     return serverError(res, String(err));
   }
 });

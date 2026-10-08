@@ -92,7 +92,7 @@ export default function Alerts() {
     switch (type) {
       case 'warning': return <AlertTriangle className="w-5 h-5 text-warning" />;
       case 'info': return <Info className="w-5 h-5 text-primary" />;
-      case 'success': return <CheckCircle className="w-5 h-5 text-accent" />;
+      case 'success': return <CheckCircle className="w-5 h-5 text-primary" />;
     }
   };
 
@@ -100,7 +100,7 @@ export default function Alerts() {
     switch (type) {
       case 'warning': return 'bg-warning/20';
       case 'info': return 'bg-primary/20';
-      case 'success': return 'bg-accent/20';
+      case 'success': return 'bg-primary/10';
     }
   };
 

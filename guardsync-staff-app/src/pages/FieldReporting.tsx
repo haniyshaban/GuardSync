@@ -609,12 +609,12 @@ export default function FieldReporting() {
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                           report.reportType === 'voice_note'
                             ? 'bg-primary/20'
-                            : 'bg-accent/20'
+                            : 'bg-primary/10'
                         }`}>
                           {report.reportType === 'voice_note' ? (
                             <Mic className="w-5 h-5 text-primary" />
                           ) : (
-                            <Video className="w-5 h-5 text-accent" />
+                            <Video className="w-5 h-5 text-primary" />
                           )}
                         </div>
                         <div>

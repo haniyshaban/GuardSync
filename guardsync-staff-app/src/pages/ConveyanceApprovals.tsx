@@ -139,7 +139,7 @@ export default function ConveyanceApprovals() {
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className={actionType === 'approve' ? 'text-accent' : 'text-destructive'}>
+            <DialogTitle className={actionType === 'approve' ? 'text-primary' : 'text-destructive'}>
               {actionType === 'approve' ? 'Approve' : 'Deny'} Conveyance Request
             </DialogTitle>
             <DialogDescription>
@@ -285,7 +285,7 @@ export default function ConveyanceApprovals() {
           </div>
         ) : !isFetching ? (
           <div className="glass-card p-8 text-center mb-6">
-            <Check className="w-12 h-12 text-accent mx-auto mb-3" />
+            <Check className="w-12 h-12 text-primary mx-auto mb-3" />
             <p className="font-medium text-foreground">All caught up!</p>
             <p className="text-sm text-muted-foreground">No pending requests to review.</p>
           </div>
@@ -305,10 +305,10 @@ export default function ConveyanceApprovals() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          request.status === 'approved' ? 'bg-accent/20' : 'bg-destructive/20'
+                          request.status === 'approved' ? 'bg-primary/10' : 'bg-destructive/20'
                         }`}>
                           {request.status === 'approved' ? (
-                            <Check className="w-4 h-4 text-accent" />
+                            <Check className="w-4 h-4 text-primary" />
                           ) : (
                             <X className="w-4 h-4 text-destructive" />
                           )}

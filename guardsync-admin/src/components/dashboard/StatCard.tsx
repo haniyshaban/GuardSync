@@ -2,10 +2,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { ReactNode } from 'react';
 
 interface StatCardProps {
   title: string;
-  value: string | number;
+  value: string | number | ReactNode;
   icon: LucideIcon;
   trend?: {
     value: number;
@@ -44,7 +45,7 @@ export function StatCard({
   };
 
   const content = (
-    <Card variant="elevated" className={cn(variantStyles[variant], className)}>
+    <Card variant="elevated" className={cn("h-full", variantStyles[variant], className)}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
@@ -70,7 +71,7 @@ export function StatCard({
     </Card>
   );
 
-  const wrapperClass = "transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 block";
+  const wrapperClass = "transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 block h-full";
 
   if (to) {
     return (

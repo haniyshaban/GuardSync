@@ -273,10 +273,10 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-        <button className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+        <button className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-              <FileText className="w-5 h-5 text-accent" />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-primary" />
             </div>
             <div className="text-left">
               <p className="font-medium text-foreground">View Payslip</p>
@@ -388,7 +388,7 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
           {/* Earnings */}
           <Card>
             <CardHeader className="py-3">
-              <CardTitle className="text-sm flex items-center gap-2 text-accent">
+              <CardTitle className="text-sm flex items-center gap-2 text-primary">
                 <DollarSign className="w-4 h-4" />
                 Earnings
               </CardTitle>
@@ -398,14 +398,14 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
                 <span className="text-muted-foreground">
                   Basic Pay ({payroll.totalDaysWorked} days × ₹{payroll.dailyRate})
                 </span>
-                <span className="font-medium text-accent">
+                <span className="font-medium text-primary">
                   ₹{payroll.grossPay.toLocaleString('en-IN')}
                 </span>
               </div>
               <Separator />
               <div className="flex justify-between text-sm font-semibold">
                 <span>Gross Earnings</span>
-                <span className="text-accent">₹{payroll.grossPay.toLocaleString('en-IN')}</span>
+                <span className="text-primary">₹{payroll.grossPay.toLocaleString('en-IN')}</span>
               </div>
             </CardContent>
           </Card>

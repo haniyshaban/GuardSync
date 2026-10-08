@@ -52,7 +52,7 @@ const createSiteIcon = (active: boolean = true) => {
       className: 'custom-site-marker',
       html: `
         <div class="relative">
-          <div class="w-8 h-8 rounded-lg bg-primary/80 border-2 border-primary flex items-center justify-center shadow-lg" style="background: hsl(192, 95%, 50%); border-color: hsl(192, 95%, 60%);">
+          <div class="w-8 h-8 rounded-lg bg-primary/80 border-2 border-primary flex items-center justify-center shadow-lg" style="background: #4D6A57; border-color: #4D6A57;">
             <svg class="w-4 h-4" fill="white" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
             </svg>
@@ -478,8 +478,8 @@ export function LiveMap({
                 key={`geofence-poly-${site.id}`}
                 positions={((site as any).geofencePolygon as Array<any>).map((p: any) => [p.lat, p.lng]) as any}
                 pathOptions={{
-                  color: 'hsl(192, 95%, 50%)',
-                  fillColor: 'hsl(192, 95%, 50%)',
+                  color: '#4D6A57',
+                  fillColor: '#4D6A57',
                   fillOpacity: 0.08,
                   weight: 2,
                 }}
@@ -490,8 +490,8 @@ export function LiveMap({
                 center={[site.location.lat, site.location.lng]}
                 radius={site.geofenceRadius}
                 pathOptions={{
-                  color: 'hsl(192, 95%, 50%)',
-                  fillColor: 'hsl(192, 95%, 50%)',
+                  color: '#4D6A57',
+                  fillColor: '#4D6A57',
                   fillOpacity: 0.1,
                   weight: 2,
                   dashArray: '5, 5',
@@ -516,7 +516,7 @@ export function LiveMap({
           >
             <Popup>
               <div className="p-2 min-w-[200px]">
-                <h3 className="font-semibold text-foreground" style={{ color: '#0f172a' }}>{site.name}</h3>
+                <h3 className="font-semibold text-foreground" style={{ color: '#121412' }}>{site.name}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{site.address}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant={site.isActive ? 'success' : 'secondary'}>
@@ -578,7 +578,7 @@ export function LiveMap({
                   </div>
                   <div className="flex items-center gap-2">
                     <div className={`status-dot status-${guard.status}`} />
-                    <h3 className="font-semibold text-foreground" style={{ color: '#0f172a' }}>{guard.name}</h3>
+                    <h3 className="font-semibold text-foreground" style={{ color: '#121412' }}>{guard.name}</h3>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">ID: {guard.employeeId}</p>
                   <p className="text-xs text-muted-foreground mt-1">Phone: <a href={`tel:${guard.phone}`} className="underline">{guard.phone}</a></p>
@@ -612,7 +612,7 @@ export function LiveMap({
           const trail = generateMockTrail(g, 10);
           return (
             <>
-              <Polyline key={`trail-${g.id}`} positions={trail as any} pathOptions={{ color: 'hsl(192, 95%, 50%)', weight: 3, opacity: 0.6 }} />
+              <Polyline key={`trail-${g.id}`} positions={trail as any} pathOptions={{ color: '#4D6A57', weight: 3, opacity: 0.6 }} />
               {/* playback by either parent props or local playback controls */}
               {((typeof playbackTrigger !== 'undefined' && playbackGuardId === g.id && playbackTrigger) || (localPlaybackGuardId === g.id && localPlaybackTrigger)) && (
                 <PlaybackController positions={trail} trigger={localPlaybackGuardId === g.id ? localPlaybackTrigger : playbackTrigger} />

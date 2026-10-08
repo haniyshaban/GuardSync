@@ -49,8 +49,8 @@ function FaceApiLoader({ children }: { children: React.ReactNode }) {
   if (!modelsLoaded && !modelsError) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-        <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center glow-primary mb-4">
-          <img src="/favicon.ico" alt="GuardSync" className="w-7 h-7" />
+        <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center mb-4">
+          <img src="/guardsync-mark.svg" alt="GuardSync" className="w-8 h-8" />
         </div>
         <h2 className="text-xl font-semibold text-foreground mb-2">GuardSync</h2>
         <p className="text-muted-foreground text-sm">Loading face recognition models...</p>

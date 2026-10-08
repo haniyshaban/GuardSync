@@ -436,7 +436,7 @@ export default function PatrolMode() {
                           <div
                             className={`w-10 h-10 rounded-full flex items-center justify-center ${
                               point.isCompleted
-                                ? 'bg-accent/20'
+                                ? 'bg-primary/10'
                                 : point.id === nextPoint?.id
                                 ? 'bg-green-500/20 animate-pulse'
                                 : point.distance && point.distance <= point.radiusMeters
@@ -445,7 +445,7 @@ export default function PatrolMode() {
                             }`}
                           >
                             {point.isCompleted ? (
-                              <CheckCircle className="w-5 h-5 text-accent" />
+                              <CheckCircle className="w-5 h-5 text-primary" />
                             ) : point.id === nextPoint?.id ? (
                               <span className="text-sm font-bold text-green-500">
                                 {point.order}
@@ -473,7 +473,7 @@ export default function PatrolMode() {
                                   }
                                   className={
                                     point.distance <= point.radiusMeters
-                                      ? 'bg-accent/20 text-accent'
+                                      ? 'bg-primary/10 text-primary'
                                       : ''
                                   }
                                 >
@@ -483,7 +483,7 @@ export default function PatrolMode() {
                               {point.distance && point.distance <= point.radiusMeters && (
                                 <Badge
                                   variant="outline"
-                                  className="border-accent text-accent"
+                                  className="border-primary text-primary"
                                 >
                                   In Range
                                 </Badge>
@@ -527,9 +527,9 @@ export default function PatrolMode() {
 
         {/* Completion Message */}
         {completedCount === totalCount && totalCount > 0 && (
-          <Card className="glass-card border-0 mt-6 bg-accent/10">
+          <Card className="glass-card border-0 mt-6 bg-primary/10">
             <CardContent className="p-6 text-center">
-              <CheckCircle className="w-12 h-12 text-accent mx-auto mb-3" />
+              <CheckCircle className="w-12 h-12 text-primary mx-auto mb-3" />
               <h3 className="text-lg font-bold text-foreground mb-2">
                 Patrol Complete!
               </h3>

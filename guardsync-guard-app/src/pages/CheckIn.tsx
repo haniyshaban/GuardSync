@@ -7,13 +7,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { BottomNav } from '@/components/BottomNav';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDistance } from '@/lib/utils';
-import { clockIn, createNotification } from '@/services/GuardAPI';
+import { clockIn, createNotification, saveFaceDescriptor } from '@/services/GuardAPI';
+import { descriptorToString } from '@/services/FaceApiService';
 
 type CheckInStep = 'confirm' | 'scanning' | 'submitting' | 'success';
 
 export default function CheckIn() {
   const navigate = useNavigate();
-  const { guard, site } = useAuth();
+  const { guard, site, updateGuard } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = useState<CheckInStep>('confirm');
   const [checkInTime, setCheckInTime] = useState<string>('');
@@ -25,10 +26,25 @@ export default function CheckIn() {
     hour12: true,
   });
 
-  const handleScanComplete = async (success: boolean) => {
+  // First check-in enrols the guard's face; every later one is verified against it
+  const isFaceEnrolled = !!guard?.faceDescriptor;
+
+  const handleScanComplete = async (success: boolean, descriptor?: Float32Array) => {
     if (success) {
       setStep('submitting');
       try {
+        if (!isFaceEnrolled) {
+          if (!descriptor || !guard?.id) {
+            throw new Error('No face was captured');
+          }
+          const descriptorStr = descriptorToString(descriptor);
+          const saved = await saveFaceDescriptor(guard.id, descriptorStr);
+          if (!saved.success) {
+            throw new Error('Could not save your face enrolment');
+          }
+          updateGuard({ faceDescriptor: descriptorStr });
+        }
+
         // Get current position for geofence check
         let lat: number | undefined;
         let lng: number | undefined;
@@ -55,6 +71,7 @@ export default function CheckIn() {
 
         // Log attendance to API
         const response = await clockIn(guard?.id || '', {
+          siteId: guard?.currentShift?.siteId || site?.id,
           shiftId: guard?.currentShift?.id,
           latitude: lat,
           longitude: lng,
@@ -64,6 +81,9 @@ export default function CheckIn() {
         if (!response.success) {
           throw new Error(response.error || 'Failed to log check-in');
         }
+
+        // Mark the guard as on duty so the dashboard reflects it straight away
+        updateGuard({ status: 'active' });
 
         // Create notification for successful check-in
         await createNotification({
@@ -102,6 +122,8 @@ export default function CheckIn() {
   if (step === 'scanning') {
     return (
       <FacialScanner
+        mode={isFaceEnrolled ? 'verify' : 'capture'}
+        storedDescriptor={guard?.faceDescriptor}
         onScanComplete={handleScanComplete}
         onCancel={() => setStep('confirm')}
       />
@@ -146,7 +168,7 @@ export default function CheckIn() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Verification</span>
-              <span className="font-medium text-accent flex items-center gap-1">
+              <span className="font-medium text-primary flex items-center gap-1">
                 <Scan className="w-4 h-4" />
                 Facial ID
               </span>
@@ -199,8 +221,8 @@ export default function CheckIn() {
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
-                <Clock className="w-5 h-5 text-accent" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Scheduled Time</p>
@@ -221,7 +243,7 @@ export default function CheckIn() {
         {/* Facial Recognition Button */}
         <button
           onClick={() => setStep('scanning')}
-          className="w-full glass-card p-6 flex flex-col items-center gap-4 hover:bg-white/10 transition-all duration-300 group mb-4"
+          className="w-full glass-card p-6 flex flex-col items-center gap-4 hover:bg-accent transition-all duration-300 group mb-4"
         >
           <div className="relative">
             <div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center group-hover:bg-primary/20 transition-colors">

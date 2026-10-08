@@ -21,8 +21,8 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
+      const result = await login(email, password);
+      if (result.success) {
         toast({
           title: 'Welcome back!',
           description: 'You have successfully logged in.',
@@ -31,7 +31,7 @@ export default function Login() {
       } else {
         toast({
           title: 'Login failed',
-          description: 'Invalid email or password',
+          description: result.error || 'Invalid email or password',
           variant: 'destructive',
         });
       }
@@ -50,8 +50,8 @@ export default function Login() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
       {/* Logo */}
       <div className="mb-8 text-center">
-        <div className="w-10 h-10 mx-auto mb-4 rounded-lg bg-primary/20 flex items-center justify-center glow-primary overflow-hidden">
-          <img src="/favicon.ico" alt="GuardSync" className="w-6 h-6" />
+        <div className="w-10 h-10 mx-auto mb-4 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+          <img src="/guardsync-mark.svg" alt="GuardSync" className="w-7 h-7" />
         </div>
         <h1 className="text-2xl font-bold text-foreground">GuardSync Staff</h1>
         <p className="text-muted-foreground text-sm mt-1">Field Officer Portal</p>

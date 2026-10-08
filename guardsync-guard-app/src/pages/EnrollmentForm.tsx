@@ -368,7 +368,7 @@ export default function EnrollmentForm() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Aadhar</span>
-                <span className="font-medium text-accent flex items-center gap-1">
+                <span className="font-medium text-primary flex items-center gap-1">
                   <CheckCircle className="w-4 h-4" />
                   Verified
                 </span>
@@ -523,7 +523,7 @@ export default function EnrollmentForm() {
                   className="border-2 border-dashed border-secondary rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
                 >
                   {files.photograph ? (
-                    <div className="flex items-center justify-center gap-2 text-accent">
+                    <div className="flex items-center justify-center gap-2 text-primary">
                       <CheckCircle className="w-5 h-5" />
                       <span>{files.photograph.name}</span>
                     </div>
@@ -580,8 +580,8 @@ export default function EnrollmentForm() {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <div className="w-24 h-24 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-6">
-                      <CheckCircle className="w-12 h-12 text-accent" />
+                    <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle className="w-12 h-12 text-primary" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">
                       Face Enrolled Successfully
@@ -659,7 +659,7 @@ export default function EnrollmentForm() {
                     className="border-2 border-dashed border-secondary rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors"
                   >
                     {files.aadharDoc ? (
-                      <div className="flex items-center justify-center gap-2 text-accent">
+                      <div className="flex items-center justify-center gap-2 text-primary">
                         <CheckCircle className="w-4 h-4" />
                         <span className="text-sm">{files.aadharDoc.name}</span>
                       </div>
@@ -696,7 +696,7 @@ export default function EnrollmentForm() {
                     className="border-2 border-dashed border-secondary rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors"
                   >
                     {files.panDoc ? (
-                      <div className="flex items-center justify-center gap-2 text-accent">
+                      <div className="flex items-center justify-center gap-2 text-primary">
                         <CheckCircle className="w-4 h-4" />
                         <span className="text-sm">{files.panDoc.name}</span>
                       </div>
@@ -784,7 +784,7 @@ export default function EnrollmentForm() {
                   className="border-2 border-dashed border-secondary rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors"
                 >
                   {files.relievingLetter ? (
-                    <div className="flex items-center justify-center gap-2 text-accent">
+                    <div className="flex items-center justify-center gap-2 text-primary">
                       <CheckCircle className="w-4 h-4" />
                       <span className="text-sm">{files.relievingLetter.name}</span>
                     </div>
@@ -815,7 +815,7 @@ export default function EnrollmentForm() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Face</span>
-                  <span className="font-medium text-accent flex items-center gap-1">
+                  <span className="font-medium text-primary flex items-center gap-1">
                     <CheckCircle className="w-4 h-4" />
                     Enrolled
                   </span>

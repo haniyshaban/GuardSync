@@ -10,7 +10,7 @@ interface AuthContextType {
   staff: Staff | null;
   attendance: StaffAttendance | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   setAttendance: (attendance: StaffAttendance | null) => void;
 }
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       // Call the platform server API for staff login
       const response = await api.post<{ success: boolean; token?: string; staff?: any; error?: string }>(
@@ -61,12 +61,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         setStaff(staffData);
         localStorage.setItem('guardwise_staff', JSON.stringify(staffData));
-        return true;
+        return { success: true };
       }
-      return false;
+      
+      // Extract error message properly from ApiResponse error object
+      const errorMessage = response.error?.message || response.error || 'Login failed';
+      return { success: false, error: errorMessage };
     } catch (error) {
       console.error('Login error:', error);
-      return false;
+      return { success: false, error: 'Network error. Please check your connection.' };
     }
   };
 

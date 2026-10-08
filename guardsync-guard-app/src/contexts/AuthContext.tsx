@@ -80,8 +80,8 @@ const DEMO_FALLBACK_GUARD: Guard = {
     date: new Date().toISOString().split('T')[0],
     startTime: '08:00',
     endTime: '16:00',
-    location: 'HBR Mini Forest',
-    siteId: 'hbr-mini-forest',
+    location: 'Cedar Grove Park',
+    siteId: 'cedar-grove-park',
     status: 'scheduled',
     isNightShift: false,
   },
@@ -170,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             status: 'scheduled',
             isNightShift: isNightShift,
           } : undefined,
+          faceDescriptor: apiGuard.faceDescriptor || undefined,
         };
 
         setGuard(mappedGuard);
@@ -177,7 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: true };
       }
 
-      return { success: false, error: response.error || 'Login failed' };
+      // Extract error message properly from ApiResponse error object
+      const errorMessage = response.error?.message || response.error || 'Login failed';
+      return { success: false, error: errorMessage };
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: 'Network error. Please check your connection.' };
@@ -256,9 +259,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateGuard = (updates: Partial<Guard>) => {
-    if (guard) {
-      setGuard({ ...guard, ...updates });
-    }
+    // Functional update so several updates in a row do not overwrite each other
+    setGuard((prev) => (prev ? { ...prev, ...updates } : prev));
   };
 
   return (

@@ -44,7 +44,7 @@ export default function Profile() {
   const getOnboardingBadge = () => {
     switch (guard?.onboardingStatus) {
       case 'active':
-        return <Badge className="bg-accent/20 text-accent">Verified Guard</Badge>;
+        return <Badge className="bg-primary/10 text-primary">Verified Guard</Badge>;
       case 'verified':
         return <Badge className="bg-warning/20 text-warning">Pending Activation</Badge>;
       case 'pending':
@@ -136,7 +136,7 @@ export default function Profile() {
             <p className="text-sm text-muted-foreground">Shifts Completed</p>
           </div>
           <div className="glass-card p-4 text-center">
-            <p className="text-3xl font-bold text-accent">{profileStats.attendanceRate}%</p>
+            <p className="text-3xl font-bold text-primary">{profileStats.attendanceRate}%</p>
             <p className="text-sm text-muted-foreground">Attendance Rate</p>
           </div>
         </div>
@@ -172,7 +172,7 @@ export default function Profile() {
             <button
               key={item.label}
               onClick={() => item.path && navigate(item.path)}
-              className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+              className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">

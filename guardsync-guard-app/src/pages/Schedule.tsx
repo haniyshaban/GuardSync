@@ -154,8 +154,8 @@ export default function Schedule() {
 
   // Get shift type display info
   const shiftTypeInfo = guard?.currentShift?.isNightShift 
-    ? { icon: Moon, label: 'Night Shift', color: 'text-purple-400' }
-    : { icon: Sun, label: 'Day Shift', color: 'text-yellow-400' };
+    ? { icon: Moon, label: 'Night Shift', color: 'text-indigo-500' }
+    : { icon: Sun, label: 'Day Shift', color: 'text-amber-600' };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -209,13 +209,13 @@ export default function Schedule() {
         {/* Week View */}
         <div className="glass-card p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+            <button className="p-2 hover:bg-accent rounded-lg transition-colors">
               <ChevronLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <p className="font-semibold text-foreground">
               {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </p>
-            <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+            <button className="p-2 hover:bg-accent rounded-lg transition-colors">
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
@@ -233,11 +233,11 @@ export default function Schedule() {
                     "flex flex-col items-center py-3 rounded-lg transition-all",
                     isSelected 
                       ? "gradient-primary text-primary-foreground" 
-                      : "hover:bg-white/10",
+                      : "hover:bg-accent",
                     isToday(date) && !isSelected && "ring-1 ring-primary"
                   )}
                 >
-                  <span className="text-xs text-muted-foreground mb-1">
+                  <span className={cn("text-xs mb-1", isSelected ? "text-primary-foreground/80" : "text-muted-foreground")}>
                     {weekDays[index]}
                   </span>
                   <span className={cn(
@@ -280,7 +280,7 @@ export default function Schedule() {
                       "text-xs px-2 py-1 rounded-full font-medium",
                       shift.status === 'today' && "bg-primary/20 text-primary",
                       shift.status === 'upcoming' && "bg-warning/20 text-warning",
-                      shift.status === 'completed' && "bg-accent/20 text-accent"
+                      shift.status === 'completed' && "bg-primary/10 text-primary"
                     )}>
                       {shift.status === 'today' ? 'Today' : 
                        shift.status === 'completed' ? 'Completed' : 'Upcoming'}

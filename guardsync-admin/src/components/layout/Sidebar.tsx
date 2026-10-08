@@ -52,8 +52,8 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center glow-primary overflow-hidden">
-            <img src="/favicon.ico" alt="GuardSync" className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+            <img src="/guardsync-mark.svg" alt="GuardSync" className="w-7 h-7" />
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
@@ -153,8 +153,8 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose
         <aside className="fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border z-50 flex flex-col transition-all duration-200 w-64">
           <div className="h-16 flex items-center px-4 border-b border-sidebar-border">
             <div className="flex items-center gap-3 w-full">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center glow-primary overflow-hidden">
-                <img src="/favicon.ico" alt="GuardSync" className="w-6 h-6" />
+              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+                <img src="/guardsync-mark.svg" alt="GuardSync" className="w-7 h-7" />
               </div>
               <div className="flex items-center justify-between w-full">
                 <div>

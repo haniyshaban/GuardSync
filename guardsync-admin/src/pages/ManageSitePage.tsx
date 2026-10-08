@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, GripVertical, Search, UserPlus, X, Check, Sun, Moon } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, GripVertical, Search, UserPlus, X, Check, Sun, Moon, AlertTriangle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -51,6 +51,10 @@ export default function ManageSitePage() {
   const [guardSearchQuery, setGuardSearchQuery] = useState('');
   const [selectedGuardsToAdd, setSelectedGuardsToAdd] = useState<string[]>([]);
   const [shiftFilter, setShiftFilter] = useState<'all' | 'day' | 'night'>('all');
+  
+  // Delete confirmation dialog
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Fetch all guards from API
   useEffect(() => {
@@ -261,9 +265,10 @@ export default function ManageSitePage() {
   }
 
   async function deleteSite() {
-    if (!site) return;
-    const ok = window.confirm('Delete site "' + site.name + '"? This will remove the site and unassign its guards.');
-    if (!ok) return;
+    if (!site || deleteConfirmText !== site.name) {
+      alert('Please type the exact site name to confirm deletion.');
+      return;
+    }
     try {
       // Delete from API
       const res = await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(site.id))}`, {
@@ -281,6 +286,9 @@ export default function ManageSitePage() {
     } catch (err) {
       console.error('Failed to delete site:', err);
       alert('Failed to delete site');
+    } finally {
+      setShowDeleteDialog(false);
+      setDeleteConfirmText('');
     }
   }
 
@@ -644,7 +652,7 @@ export default function ManageSitePage() {
                           <Circle
                             center={[site.location.lat, site.location.lng]}
                             radius={radiusValue}
-                            pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2 }}
+                            pathOptions={{ color: '#4D6A57', fillColor: '#4D6A57', fillOpacity: 0.2 }}
                           />
                         </MapContainer>
                       </div>
@@ -694,16 +702,19 @@ export default function ManageSitePage() {
 
         {/* Danger zone: moved lower so user must scroll to reach it */}
         <div className="mt-8">
-          <Card>
+          <Card className="border-destructive/30 bg-destructive/5">
             <CardHeader>
-              <CardTitle className="text-sm">Danger Zone</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                Danger Zone
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Deleting a site removes it and will unassign any guards. This action is irreversible.</p>
               <div className="mt-4">
                 <Button
                   variant="outline"
-                  onClick={deleteSite}
+                  onClick={() => setShowDeleteDialog(true)}
                   className="w-full sm:w-1/5 text-left border-red-200 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 hover:border-red-300 focus:text-red-700"
                 >
                   Delete site
@@ -825,6 +836,56 @@ export default function ManageSitePage() {
             >
               <Plus className="w-4 h-4 mr-2" />
               Add {selectedGuardsToAdd.length > 0 ? `(${selectedGuardsToAdd.length})` : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Site Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        setShowDeleteDialog(open);
+        if (!open) setDeleteConfirmText('');
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Delete Site
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>{site?.name}</strong> and all associated data. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                Type <strong className="text-destructive">{site?.name}</strong> to confirm:
+              </label>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Enter site name"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setDeleteConfirmText('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteSite}
+              disabled={deleteConfirmText !== site?.name}
+            >
+              Delete Site
             </Button>
           </DialogFooter>
         </DialogContent>

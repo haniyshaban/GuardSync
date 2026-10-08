@@ -72,3 +72,7 @@ guardsync-staff-app/android/app/src/main/assets/public/
 bun.lockb
 yarn.lock
 pnpm-lock.yaml
+
+# Customer-specific forks (maintained in separate repositories)
+blackbelt-guardsync/
+*-guardsync/

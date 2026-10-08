@@ -363,8 +363,8 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
               {stat.trend && (
                 <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="w-3 h-3 text-accent" />
-                  <span className="text-xs text-accent">{stat.trend}</span>
+                  <TrendingUp className="w-3 h-3 text-primary" />
+                  <span className="text-xs text-primary">{stat.trend}</span>
                 </div>
               )}
             </div>
@@ -376,7 +376,7 @@ export default function Dashboard() {
         <div className="space-y-3">
           <button
             onClick={() => navigate('/conveyance')}
-            className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+            className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center">
@@ -397,7 +397,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => navigate('/reporting')}
-            className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+            className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
@@ -412,11 +412,11 @@ export default function Dashboard() {
           </button>
 
           <button
-            className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+            className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-accent" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-primary" />
               </div>
               <div className="text-left">
                 <p className="font-medium text-foreground">Attendance History</p>

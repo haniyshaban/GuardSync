@@ -190,14 +190,14 @@ export default function PersonalInfo() {
                 <p className="font-medium text-foreground">{guard?.name || 'N/A'}</p>
               </div>
             </div>
-            <Separator className="bg-white/10" />
+            <Separator className="bg-border" />
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Employee ID</p>
                 <p className="font-mono font-medium text-primary">{guard?.employeeId || 'N/A'}</p>
               </div>
             </div>
-            <Separator className="bg-white/10" />
+            <Separator className="bg-border" />
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Email</p>
@@ -205,7 +205,7 @@ export default function PersonalInfo() {
               </div>
               <Mail className="w-4 h-4 text-muted-foreground" />
             </div>
-            <Separator className="bg-white/10" />
+            <Separator className="bg-border" />
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Date of Joining</p>
@@ -213,7 +213,7 @@ export default function PersonalInfo() {
               </div>
               <Calendar className="w-4 h-4 text-muted-foreground" />
             </div>
-            <Separator className="bg-white/10" />
+            <Separator className="bg-border" />
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Daily Rate</p>
@@ -313,7 +313,7 @@ export default function PersonalInfo() {
                   </div>
                   <Phone className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <Separator className="bg-white/10" />
+                <Separator className="bg-border" />
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Address</p>
@@ -321,7 +321,7 @@ export default function PersonalInfo() {
                   </div>
                   <MapPin className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <Separator className="bg-white/10" />
+                <Separator className="bg-border" />
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Emergency Contact</p>
@@ -350,7 +350,7 @@ export default function PersonalInfo() {
                 </p>
               </div>
             </div>
-            <Separator className="bg-white/10" />
+            <Separator className="bg-border" />
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">PAN Number</p>
@@ -465,7 +465,7 @@ export default function PersonalInfo() {
                     </p>
                   </div>
                 </div>
-                <Separator className="bg-white/10" />
+                <Separator className="bg-border" />
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Account Number</p>
@@ -474,7 +474,7 @@ export default function PersonalInfo() {
                     </p>
                   </div>
                 </div>
-                <Separator className="bg-white/10" />
+                <Separator className="bg-border" />
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">IFSC Code</p>
@@ -483,7 +483,7 @@ export default function PersonalInfo() {
                     </p>
                   </div>
                 </div>
-                <Separator className="bg-white/10" />
+                <Separator className="bg-border" />
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Bank Name</p>

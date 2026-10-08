@@ -85,7 +85,7 @@ export default function LeaveManagement() {
   const getStatusColor = (status: LeaveRequest['status']) => {
     switch (status) {
       case 'approved':
-        return 'bg-accent/20 text-accent';
+        return 'bg-primary/10 text-primary';
       case 'pending':
         return 'bg-warning/20 text-warning';
       case 'rejected':
@@ -345,7 +345,7 @@ export default function LeaveManagement() {
             <p className="text-xs text-muted-foreground">Total</p>
           </div>
           <div className="glass-card p-3 text-center">
-            <p className="text-lg font-bold text-accent">{stats.approved}</p>
+            <p className="text-lg font-bold text-primary">{stats.approved}</p>
             <p className="text-xs text-muted-foreground">Approved</p>
           </div>
           <div className="glass-card p-3 text-center">

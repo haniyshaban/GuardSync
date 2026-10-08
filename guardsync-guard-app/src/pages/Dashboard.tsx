@@ -31,6 +31,7 @@ import {
   cancelConveyanceRequest,
   ConveyanceRequest,
   sendSOSAlert,
+  clockOut,
   updateGuardLocation
 } from '@/services/GuardAPI';
 
@@ -44,9 +45,37 @@ const MAX_WAKE_INTERVAL = 90 * 60 * 1000; // 90 minutes maximum
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { guard } = useAuth();
+  const { guard, updateGuard } = useAuth();
   const { toast } = useToast();
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  // On duty is driven by the guard's clock-in status, so it survives navigation and reloads
+  const [isCheckedIn, setIsCheckedIn] = useState(guard?.status === 'active');
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  useEffect(() => {
+    setIsCheckedIn(guard?.status === 'active');
+  }, [guard?.status]);
+
+  const handleCheckOut = async () => {
+    if (!guard?.id || isCheckingOut) return;
+    setIsCheckingOut(true);
+    try {
+      const response = await clockOut(guard.id, { latitude: 0, longitude: 0, withinGeofence: true });
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to log check-out');
+      }
+      updateGuard({ status: 'off-duty' });
+      toast({ title: 'Checked Out', description: 'Your shift has been logged.' });
+    } catch (err) {
+      console.error('Check-out error:', err);
+      toast({
+        title: 'Check-out Failed',
+        description: 'Could not log your check-out. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
   
   // Transport mode state
   const [isTransportMode, setIsTransportMode] = useState(false);
@@ -524,7 +553,7 @@ export default function Dashboard() {
             {guard?.faceDescriptor && (
               <div className="space-y-3">
                 {isWakeFaceVerified ? (
-                  <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-accent/20 text-accent">
+                  <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-primary/10 text-primary">
                     <CheckCircle className="w-5 h-5" />
                     <span className="font-medium">Face Verified</span>
                   </div>
@@ -748,7 +777,8 @@ export default function Dashboard() {
                 <Button 
                   variant="destructive" 
                   className="flex-1"
-                  onClick={() => setIsCheckedIn(false)}
+                  onClick={handleCheckOut}
+                  disabled={isCheckingOut}
                 >
                   <LogOut className="w-5 h-5 mr-2" />
                   Check Out
@@ -821,7 +851,7 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">Total</p>
               </div>
               <div>
-                <p className="text-lg font-bold text-accent">{wakeAlertStats.success}</p>
+                <p className="text-lg font-bold text-primary">{wakeAlertStats.success}</p>
                 <p className="text-xs text-muted-foreground">Passed</p>
               </div>
               <div>
@@ -860,11 +890,11 @@ export default function Dashboard() {
 
         {/* Conveyance Approved Status */}
         {conveyanceStatus && conveyanceStatus.status === 'approved' && (
-          <div className="glass-card p-4 mb-6 border border-accent/30">
+          <div className="glass-card p-4 mb-6 border border-primary/30">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-accent" />
-                <span className="text-sm font-medium text-accent">Conveyance Approved</span>
+                <CheckCircle className="w-5 h-5 text-primary" />
+                <span className="text-sm font-medium text-primary">Conveyance Approved</span>
               </div>
               <Button
                 variant="ghost"
@@ -904,8 +934,8 @@ export default function Dashboard() {
               <p className="text-2xl font-bold text-foreground">{stat.value}</p>
               <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
               <div className="flex items-center gap-1 mt-2">
-                <TrendingUp className="w-3 h-3 text-accent" />
-                <span className="text-xs text-accent">{stat.trend}</span>
+                <TrendingUp className="w-3 h-3 text-primary" />
+                <span className="text-xs text-primary">{stat.trend}</span>
               </div>
             </div>
           ))}
@@ -916,7 +946,7 @@ export default function Dashboard() {
         <div className="space-y-3">
           <button 
             onClick={() => navigate('/schedule')}
-            className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+            className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
@@ -931,7 +961,7 @@ export default function Dashboard() {
           </button>
 
           <button 
-            className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+            className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center">
@@ -947,11 +977,11 @@ export default function Dashboard() {
 
           <button 
             onClick={() => navigate('/patrol')}
-            className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+            className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-                <Navigation className="w-5 h-5 text-accent" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Navigation className="w-5 h-5 text-primary" />
               </div>
               <div className="text-left">
                 <p className="font-medium text-foreground">Patrol Mode</p>
@@ -963,7 +993,7 @@ export default function Dashboard() {
 
           <button 
             onClick={() => navigate('/leave')}
-            className="w-full glass-card p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+            className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">

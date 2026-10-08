@@ -75,19 +75,37 @@ export const updateGuardProfile = async (
   return api.put(`/guards/${guardId}`, updates);
 };
 
+// ============ Face enrolment ============
+
+/** Saves the guard's face descriptor the first time they scan (see PUT /guards/:id/face) */
+export const saveFaceDescriptor = async (
+  guardId: string,
+  faceDescriptor: string
+): Promise<ApiResponse<{ guardId: string; enrolled: boolean }>> => {
+  return api.put(`/guards/${guardId}/face`, { faceDescriptor });
+};
+
 // ============ Attendance ============
 
 export const clockIn = async (
   guardId: string,
   data: {
+    siteId?: string;
     shiftId?: string;
-    latitude: number;
-    longitude: number;
+    latitude?: number;
+    longitude?: number;
     withinGeofence: boolean;
     selfieUrl?: string;
   }
 ): Promise<ApiResponse<AttendanceLog>> => {
-  return api.post('/attendance/clock-in', { guardId, ...data });
+  // The API expects siteId, lat and lng (see clockInSchema on the server)
+  return api.post('/attendance/clock-in', {
+    guardId,
+    siteId: data.siteId,
+    lat: data.latitude,
+    lng: data.longitude,
+    withinGeofence: data.withinGeofence,
+  });
 };
 
 export const clockOut = async (

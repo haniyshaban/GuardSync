@@ -270,8 +270,8 @@ export function FacialScanner({
               <p className="text-xs text-center text-muted-foreground">{errorMessage}</p>
             </div>
           ) : status === 'success' ? (
-            <div className="w-full h-full flex items-center justify-center bg-accent/20">
-              <CheckCircle className="w-16 h-16 text-accent" />
+            <div className="w-full h-full flex items-center justify-center bg-primary/10">
+              <CheckCircle className="w-16 h-16 text-primary" />
             </div>
           ) : status === 'no-match' || status === 'no-face' ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-warning/20 p-4">

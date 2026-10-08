@@ -220,6 +220,15 @@ export default function GuardsPage() {
                       <td className="p-4">
                         <div className="text-sm text-muted-foreground">
                           {(() => {
+                            // The guard's own shift comes first (same rule as the guard detail page)
+                            const g = guard as any;
+                            if (g.shiftType) {
+                              const isDay = g.shiftType === 'day';
+                              const start = g.shiftStartTime || (isDay ? '08:00' : '20:00');
+                              const end = g.shiftEndTime || (isDay ? '20:00' : '08:00');
+                              return `${isDay ? 'Day' : 'Night'} ${start}-${end}`;
+                            }
+                            // Fallback to site shifts if defined
                             const site = sites.find(s => s.id === guard.siteId);
                             if (!site) return '—';
                             const shifts = (site as any).shifts as any[] | undefined;
