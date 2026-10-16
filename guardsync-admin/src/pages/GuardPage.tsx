@@ -289,7 +289,7 @@ const GuardPage = () => {
   // Clears the enrolled face; the guard enrols again from their own phone at the next check-in.
   // (Nobody can set a face for a guard: whoever picks it could then log in as them.)
   const resetFace = async () => {
-    if (!guard || !window.confirm(`Reset ${guard.name}'s face? They will enrol it again at their next check-in.`)) return;
+    if (!guard) return;
     setIsResettingFace(true);
     try {
       const res = await fetchWithAuth(`${API_BASE_URL}/api/guards/${guard.id}/face`, { method: 'DELETE' });
@@ -1033,10 +1033,26 @@ const GuardPage = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Resetting the face clears the guard's enrolled face. They enrol it again from their own phone at their next check-in. Admins only.
                   </p>
-                  <Button variant="outline" onClick={resetFace} disabled={isResettingFace} className="w-full sm:w-auto">
-                    <ScanFace className="w-4 h-4 mr-2" />
-                    {isResettingFace ? 'Resetting...' : 'Reset Face'}
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" disabled={isResettingFace} className="w-full sm:w-auto">
+                        <ScanFace className="w-4 h-4 mr-2" />
+                        {isResettingFace ? 'Resetting...' : 'Reset Face'}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Reset {guard.name}'s face?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Their enrolled face is cleared and they enrol it again from their own phone at their next check-in. Until then, check-in has no face check.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={resetFace}>Reset Face</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               )}
               <p className="text-sm text-muted-foreground mb-4">
