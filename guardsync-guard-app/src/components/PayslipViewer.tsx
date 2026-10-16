@@ -25,6 +25,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Guard, PayrollRecord, AttendanceLog } from '@/types/guard';
 import { getPayrollRecord } from '@/services/GuardAPI';
+import { escapeHtml } from '@/lib/utils';
 
 interface PayslipViewerProps {
   guard: Guard;
@@ -201,11 +202,11 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
               <div class="section-title">Employee Details</div>
               <div class="row">
                 <span class="label">Employee Name</span>
-                <span class="value">${guard.name}</span>
+                <span class="value">${escapeHtml(guard.name)}</span>
               </div>
               <div class="row">
                 <span class="label">Employee ID</span>
-                <span class="value">${guard.employeeId}</span>
+                <span class="value">${escapeHtml(guard.employeeId)}</span>
               </div>
               <div class="row">
                 <span class="label">Department</span>
@@ -213,7 +214,7 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
               </div>
               <div class="row">
                 <span class="label">Bank Account</span>
-                <span class="value">****${guard.bankDetails?.accountNumber?.slice(-4) || 'N/A'}</span>
+                <span class="value">****${escapeHtml(guard.bankDetails?.accountNumber?.slice(-4) || 'N/A')}</span>
               </div>
             </div>
             

@@ -101,7 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { guard: savedGuard, site: savedSite } = JSON.parse(stored);
         if (savedGuard) {
-          setGuard(savedGuard);
+          // Sessions saved by older versions kept the face template on the phone. Drop it.
+          const { faceDescriptor, ...rest } = savedGuard;
+          setGuard({ ...rest, faceEnrolled: rest.faceEnrolled ?? !!faceDescriptor });
           setSite(savedSite || null);
         }
       } catch (e) {
@@ -170,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             status: 'scheduled',
             isNightShift: isNightShift,
           } : undefined,
-          faceDescriptor: apiGuard.faceDescriptor || undefined,
+          faceEnrolled: !!apiGuard.faceEnrolled,
         };
 
         setGuard(mappedGuard);
@@ -234,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               status: 'scheduled',
               isNightShift: isNightShift,
             } : undefined,
-            faceDescriptor: apiGuard.faceDescriptor || undefined,
+            faceEnrolled: !!apiGuard.faceEnrolled,
           };
           setGuard(mappedGuard);
           setSite(response.data.site || null);

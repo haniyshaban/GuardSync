@@ -11,6 +11,16 @@ export const authLimiter = rateLimit({
   message: { success: false, error: { code: 'TOO_MANY_ATTEMPTS', message: 'Too many failed attempts. Try again in 15 minutes.' } },
 });
 
+// Face checks from the guard app (check-in, wake-up checks): enough for normal use, too few to
+// probe for a matching face by trial and error.
+export const faceCheckLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'TOO_MANY_ATTEMPTS', message: 'Too many face checks. Try again in 15 minutes.' } },
+});
+
 // Rate limiter for upload endpoints
 export const uploadLimiter = rateLimit({ 
   windowMs: 60 * 1000, // 1 minute

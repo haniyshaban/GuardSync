@@ -51,3 +51,17 @@ export const truncate = (str: string, maxLength: number): string => {
 export const capitalize = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
+
+/**
+ * Escape text for use inside HTML built as a string (document.write, innerHTML).
+ * Anything that came from a user or the API must go through this before it is placed in such HTML.
+ * @param value - Any value; null and undefined become an empty string
+ * @returns The text with &, <, >, " and ' replaced by HTML entities
+ */
+export const escapeHtml = (value: unknown): string =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');

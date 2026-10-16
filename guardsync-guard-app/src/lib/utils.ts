@@ -12,6 +12,7 @@ export {
   formatDistance,
   truncate,
   capitalize,
+  escapeHtml,
   generateId,
   generateUUID,
   generateShortId,

@@ -6,7 +6,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Loader2 } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/utils';
+import { API_BASE_URL, escapeHtml } from '@/lib/utils';
 import { fetchWithAuth, parseApiData } from '@/lib/api';
 import { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
@@ -138,14 +138,17 @@ export default function ReportsPage() {
   }
 
   function openPrintable() {
+    // This window shares the dashboard's origin, so every value is escaped: guard names and
+    // site ids come from guards and must never be read as HTML.
+    const e = escapeHtml;
     const html = `
       <html><head><title>Report</title></head><body>
-        <h2>Report: ${reportType}</h2>
-        <p>From: ${fromDate} To: ${toDate}</p>
+        <h2>Report: ${e(reportType)}</h2>
+        <p>From: ${e(fromDate)} To: ${e(toDate)}</p>
         <table border="1" cellpadding="6" cellspacing="0">
           <thead><tr><th>ID</th><th>Guard</th><th>Site</th><th>Clock In</th><th>Clock Out</th><th>Within Geofence</th></tr></thead>
           <tbody>
-            ${filtered.map(r => `<tr><td>${r.id}</td><td>${r.guard?.name || ''}</td><td>${r.site?.name || r.siteId || ''}</td><td>${r.clockIn ? new Date(r.clockIn).toLocaleString() : ''}</td><td>${r.clockOut ? new Date(r.clockOut).toLocaleString() : ''}</td><td>${r.withinGeofence}</td></tr>`).join('')}
+            ${filtered.map(r => `<tr><td>${e(r.id)}</td><td>${e(r.guard?.name)}</td><td>${e(r.site?.name || r.siteId)}</td><td>${e(r.clockIn ? new Date(r.clockIn).toLocaleString() : '')}</td><td>${e(r.clockOut ? new Date(r.clockOut).toLocaleString() : '')}</td><td>${e(r.withinGeofence)}</td></tr>`).join('')}
           </tbody>
         </table>
       </body></html>`;

@@ -19,6 +19,8 @@ export interface FacialScannerProps {
   mode?: 'capture' | 'verify';
   /** For verify mode: the stored descriptor to match against */
   storedDescriptor?: string | null;
+  /** For verify mode: asks the server whether the scan matches. Takes precedence over storedDescriptor. */
+  verifyDescriptor?: (descriptor: Float32Array) => Promise<boolean>;
   /** For verify mode with multiple guards: array of {id, descriptor} */
   guardDescriptors?: { id: string; descriptor: string }[];
   /** Match threshold (lower = stricter, default 0.6) */
@@ -34,6 +36,7 @@ export function FacialScanner({
   onCancel, 
   mode = 'capture',
   storedDescriptor,
+  verifyDescriptor,
   guardDescriptors,
   matchThreshold = 0.6,
   onMatchFound
@@ -173,24 +176,23 @@ export function FacialScanner({
           }
         }
         
-        // Single stored descriptor matching
-        if (storedDescriptor) {
-          const stored = stringToDescriptor(storedDescriptor);
-          const isMatch = descriptorsMatch(descriptor, stored, matchThreshold);
-          
-          if (isMatch) {
-            setProgress(100);
-            setStatus('success');
+        // Single guard: the server compares when it can, so the enrolled face stays there
+        const isMatch = verifyDescriptor
+          ? await verifyDescriptor(descriptor)
+          : !!storedDescriptor && descriptorsMatch(descriptor, stringToDescriptor(storedDescriptor), matchThreshold);
 
-            if (stream) {
-              stream.getTracks().forEach(track => track.stop());
-            }
+        if (isMatch) {
+          setProgress(100);
+          setStatus('success');
 
-            setTimeout(() => {
-              onScanComplete(true, descriptor);
-            }, 1000);
-            return;
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
           }
+
+          setTimeout(() => {
+            onScanComplete(true, descriptor);
+          }, 1000);
+          return;
         }
 
         // No match found
@@ -211,7 +213,7 @@ export function FacialScanner({
       setStatus('error');
       setErrorMessage('Face detection failed. Please try again.');
     }
-  }, [mode, storedDescriptor, guardDescriptors, matchThreshold, onScanComplete, onMatchFound, stream, status]);
+  }, [mode, storedDescriptor, verifyDescriptor, guardDescriptors, matchThreshold, onScanComplete, onMatchFound, stream, status]);
 
   const getStatusMessage = () => {
     switch (status) {

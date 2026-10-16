@@ -167,32 +167,4 @@ describe('Auth API Tests', () => {
       expect(response.body.error).toContain('Unauthorized');
     });
   });
-
-  describe('GET /api/auth/face-descriptors', () => {
-    it('should return guards with face descriptors', async () => {
-      // Add a face descriptor to test guard
-      testDb.prepare('UPDATE guards SET faceDescriptor = ? WHERE id = ?')
-        .run('mock-face-descriptor-data', testData.guardId);
-
-      const response = await request(app)
-        .get('/api/auth/face-descriptors')
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(Array.isArray(response.body.data)).toBe(true);
-      expect(response.body.data.length).toBeGreaterThan(0);
-      expect(response.body.data[0]).toHaveProperty('id');
-      expect(response.body.data[0]).toHaveProperty('name');
-      expect(response.body.data[0]).toHaveProperty('descriptor');
-    });
-
-    it('should return empty array when no guards have face descriptors', async () => {
-      const response = await request(app)
-        .get('/api/auth/face-descriptors')
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toEqual([]);
-    });
-  });
 });

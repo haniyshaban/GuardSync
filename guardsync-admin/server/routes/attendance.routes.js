@@ -3,7 +3,7 @@ import { authMiddleware } from '../auth.js';
 import { actAsSelf, scopeQueryToSelf } from '../middleware/access.js';
 import { validate, validateQuery } from '../validation/index.js';
 import { clockInSchema, clockOutSchema, attendanceQuerySchema } from '../validation/attendance.schemas.js';
-import { attendanceRepo, guardRepo } from '../repositories/index.js';
+import { attendanceRepo, guardRepo, siteRepo } from '../repositories/index.js';
 import { facesMatch } from '../utils/face.js';
 import { success, created, error, badRequest, notFound, unauthorized, forbidden, conflict, serverError, noContent } from '../utils/responses.js';
 
@@ -55,6 +55,12 @@ router.get('/', authMiddleware(true, ['guard', 'staff', 'admin']), scopeQueryToS
 router.post('/clock-in', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(clockInSchema), (req, res) => {
   try {
     const { guard_id, site_id, lat, lng, within_geofence, face_descriptor } = req.body;
+
+    // The site must be a real one. The id is stored and shown back in admin reports,
+    // so it cannot be free text.
+    if (!siteRepo.findById(site_id)) {
+      return badRequest(res, 'Unknown site');
+    }
 
     // A guard with an enrolled face must present a matching one. The comparison happens here,
     // so a modified app cannot skip it. (An admin clocking a guard in is not face-checked.)

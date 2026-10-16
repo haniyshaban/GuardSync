@@ -40,7 +40,7 @@ export interface Guard {
   dateOfJoining?: string;
   address?: string;
   emergencyContact?: string;
-  faceDescriptor?: string; // JSON string of Float32Array for face recognition
+  faceEnrolled?: boolean; // whether a face is enrolled; the face template itself never leaves the server
 }
 
 export interface GuardDocuments {

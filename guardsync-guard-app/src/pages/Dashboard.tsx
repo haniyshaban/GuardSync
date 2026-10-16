@@ -32,8 +32,10 @@ import {
   ConveyanceRequest,
   sendSOSAlert,
   clockOut,
-  updateGuardLocation
+  updateGuardLocation,
+  verifyFace
 } from '@/services/GuardAPI';
+import { descriptorToString } from '@/services/FaceApiService';
 
 // Location sync interval (30 seconds)
 const LOCATION_SYNC_INTERVAL = 30 * 1000;
@@ -154,6 +156,13 @@ export default function Dashboard() {
     }, 1000);
   }, [isCheckedIn, isNightShift]);
 
+  // The server compares the scan with the enrolled face; the app never holds the enrolled face
+  const verifyOwnFace = async (descriptor: Float32Array) => {
+    if (!guard?.id) return false;
+    const result = await verifyFace(guard.id, descriptorToString(descriptor));
+    return result.success && result.data?.match === true;
+  };
+
   // Handle face verification for wake alert
   const handleWakeFaceVerify = (success: boolean) => {
     setShowWakeFaceVerify(false);
@@ -175,7 +184,7 @@ export default function Dashboard() {
   // Handle wake alert response
   const handleWakeAlertResponse = () => {
     // Only allow response if face is verified (when guard has face descriptor)
-    if (guard?.faceDescriptor && !isWakeFaceVerified) {
+    if (guard?.faceEnrolled && !isWakeFaceVerified) {
       toast({
         title: 'Face Verification Required',
         description: 'Please verify your face before confirming.',
@@ -514,7 +523,7 @@ export default function Dashboard() {
       {showWakeFaceVerify && (
         <FacialScanner
           mode="verify"
-          storedDescriptor={guard?.faceDescriptor}
+          verifyDescriptor={verifyOwnFace}
           matchThreshold={0.6}
           onScanComplete={handleWakeFaceVerify}
           onCancel={() => setShowWakeFaceVerify(false)}
@@ -530,7 +539,7 @@ export default function Dashboard() {
               Wake-Up Check!
             </DialogTitle>
             <DialogDescription>
-              {guard?.faceDescriptor 
+              {guard?.faceEnrolled 
                 ? 'Verify your face and press the button below to confirm you\'re awake.'
                 : 'Press the button below to confirm you\'re awake and alert.'}
             </DialogDescription>
@@ -550,7 +559,7 @@ export default function Dashboard() {
             />
 
             {/* Face verification section - only show if guard has face descriptor */}
-            {guard?.faceDescriptor && (
+            {guard?.faceEnrolled && (
               <div className="space-y-3">
                 {isWakeFaceVerified ? (
                   <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-primary/10 text-primary">
@@ -575,7 +584,7 @@ export default function Dashboard() {
               size="xl" 
               className="w-full"
               onClick={handleWakeAlertResponse}
-              disabled={guard?.faceDescriptor && !isWakeFaceVerified}
+              disabled={!!guard?.faceEnrolled && !isWakeFaceVerified}
             >
               <CheckCircle className="w-6 h-6 mr-2" />
               I'm Awake!

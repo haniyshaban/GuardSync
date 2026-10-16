@@ -1,6 +1,6 @@
 import express from 'express';
 import db, { siteRowToObj } from '../db.js';
-import { signToken, comparePassword, authMiddleware } from '../auth.js';
+import { signToken, comparePassword } from '../auth.js';
 import { validate } from '../validation/index.js';
 import { loginSchema, faceLoginSchema } from '../validation/auth.schemas.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -13,9 +13,11 @@ const router = express.Router();
 // Helper to transform guard row with business logic (decryption, masking, parsing).
 // `viewer` is the logged-in user ({ id, role }). What comes back depends on who is asking:
 //   admin        - full ID and bank details (needed to edit them)
-//   the guard    - their own record, with ID and bank numbers masked, plus their face template
-//   anyone else  - masked ID, no bank details, no face template
+//   the guard    - their own record, with ID and bank numbers masked
+//   anyone else  - masked ID, no bank details
 // With no viewer the most restricted view is returned.
+// The face template never leaves the server, not even to its own guard: anyone holding it could
+// replay it to pass the face check. Clients only learn whether a face is enrolled.
 const guardRowToObj = (row, viewer = null) => {
   const isAdmin = viewer?.role === 'admin';
   const isSelf = viewer?.role === 'guard' && viewer.id === row.id;
@@ -65,9 +67,7 @@ const guardRowToObj = (row, viewer = null) => {
     bankIfsc: isAdmin || isSelf ? decryptedBankIfsc || null : null,
     bankName: isAdmin || isSelf ? decryptedBankName || null : null,
     accountHolderName: isAdmin || isSelf ? decryptedAccountHolder || null : null,
-    // The face template itself only ever goes back to the guard it belongs to
     faceEnrolled: !!faceDescriptor,
-    ...(isSelf ? { faceDescriptor: faceDescriptor || null } : {}),
   };
 };
 
@@ -99,20 +99,6 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     const token = signToken({ id: guard.id, role: 'guard' });
 
     return success(res, { token, role: 'guard', guard: guardRowToObj(guard, { id: guard.id, role: 'guard' }), site });
-  } catch (err) {
-    return serverError(res, String(err));
-  }
-});
-
-// GET /api/auth/face-descriptors - Get all guards with face descriptors for facial recognition login
-router.get('/face-descriptors', authMiddleware(true, ['admin']), (req, res) => {
-  try {
-    const rows = db.prepare('SELECT id, name, faceDescriptor FROM guards WHERE faceDescriptor IS NOT NULL').all();
-    return success(res, rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      descriptor: row.faceDescriptor,
-    })));
   } catch (err) {
     return serverError(res, String(err));
   }

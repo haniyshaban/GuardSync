@@ -73,6 +73,7 @@ export function createTestDb() {
       password TEXT NOT NULL,
       role TEXT NOT NULL,
       isActive INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'offline',
       createdAt TEXT NOT NULL
     );
 

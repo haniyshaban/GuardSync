@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { BottomNav } from '@/components/BottomNav';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDistance } from '@/lib/utils';
-import { clockIn, createNotification, saveFaceDescriptor } from '@/services/GuardAPI';
+import { clockIn, createNotification, saveFaceDescriptor, verifyFace } from '@/services/GuardAPI';
 import { descriptorToString } from '@/services/FaceApiService';
 
 type CheckInStep = 'confirm' | 'scanning' | 'submitting' | 'success';
@@ -26,8 +26,14 @@ export default function CheckIn() {
     hour12: true,
   });
 
-  // First check-in enrols the guard's face; every later one is verified against it
-  const isFaceEnrolled = !!guard?.faceDescriptor;
+  // First check-in enrols the guard's face; every later one is verified against it on the server
+  const isFaceEnrolled = !!guard?.faceEnrolled;
+
+  const verifyOwnFace = async (descriptor: Float32Array) => {
+    if (!guard?.id) return false;
+    const result = await verifyFace(guard.id, descriptorToString(descriptor));
+    return result.success && result.data?.match === true;
+  };
 
   const handleScanComplete = async (success: boolean, descriptor?: Float32Array) => {
     if (success) {
@@ -39,10 +45,12 @@ export default function CheckIn() {
           }
           const descriptorStr = descriptorToString(descriptor);
           const saved = await saveFaceDescriptor(guard.id, descriptorStr);
-          if (!saved.success) {
+          // Already enrolled (for example from another phone): carry on, the server checks this scan at clock-in
+          const alreadyEnrolled = !saved.success && saved.error?.code === 'CONFLICT';
+          if (!saved.success && !alreadyEnrolled) {
             throw new Error('Could not save your face enrolment');
           }
-          updateGuard({ faceDescriptor: descriptorStr });
+          updateGuard({ faceEnrolled: true });
         }
 
         // Get current position for geofence check
@@ -124,7 +132,7 @@ export default function CheckIn() {
     return (
       <FacialScanner
         mode={isFaceEnrolled ? 'verify' : 'capture'}
-        storedDescriptor={guard?.faceDescriptor}
+        verifyDescriptor={verifyOwnFace}
         onScanComplete={handleScanComplete}
         onCancel={() => setStep('confirm')}
       />

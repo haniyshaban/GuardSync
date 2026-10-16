@@ -35,7 +35,8 @@ import {
   Image,
   ExternalLink,
   Sun,
-  Moon
+  Moon,
+  ScanFace
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -92,6 +93,7 @@ const GuardPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isResettingFace, setIsResettingFace] = useState(false);
 
   // Document preview dialog
   const [showDocumentPreview, setShowDocumentPreview] = useState(false);
@@ -281,6 +283,24 @@ const GuardPage = () => {
       setIsDeleting(false);
       setShowDeleteDialog(false);
       setDeleteConfirmText('');
+    }
+  };
+
+  // Clears the enrolled face; the guard enrols again from their own phone at the next check-in.
+  // (Nobody can set a face for a guard: whoever picks it could then log in as them.)
+  const resetFace = async () => {
+    if (!guard || !window.confirm(`Reset ${guard.name}'s face? They will enrol it again at their next check-in.`)) return;
+    setIsResettingFace(true);
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/guards/${guard.id}/face`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error?.message || 'Failed to reset face');
+      setGuard({ ...guard, faceEnrolled: false });
+      toast({ title: 'Face reset', description: data.message || `${guard.name} will enrol again at their next check-in.` });
+    } catch (e) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to reset face.', variant: 'destructive' });
+    } finally {
+      setIsResettingFace(false);
     }
   };
 
@@ -1008,6 +1028,17 @@ const GuardPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {guard.faceEnrolled && (
+                <div className="mb-6">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Resetting the face clears the guard's enrolled face. They enrol it again from their own phone at their next check-in. Admins only.
+                  </p>
+                  <Button variant="outline" onClick={resetFace} disabled={isResettingFace} className="w-full sm:w-auto">
+                    <ScanFace className="w-4 h-4 mr-2" />
+                    {isResettingFace ? 'Resetting...' : 'Reset Face'}
+                  </Button>
+                </div>
+              )}
               <p className="text-sm text-muted-foreground mb-4">
                 Deleting a guard will permanently remove their profile, attendance records, leave requests, and all associated data. This action cannot be undone.
               </p>

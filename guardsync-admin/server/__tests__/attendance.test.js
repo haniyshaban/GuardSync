@@ -89,6 +89,13 @@ vi.mock('../repositories/index.js', async () => {
         db.prepare('UPDATE attendance SET clockOut = ? WHERE id = ?').run(clockOut, attendanceId);
       },
     },
+    siteRepo: {
+      findById: (id) => {
+        const db = getDb();
+        if (!db) return null;
+        return db.prepare('SELECT * FROM sites WHERE id = ?').get(id);
+      },
+    },
     guardRepo: {
       findById: (id) => {
         const db = getDb();
@@ -130,6 +137,18 @@ describe('Attendance API Tests', () => {
   });
 
   describe('POST /api/attendance/clock-in', () => {
+    it('should refuse a site that does not exist', async () => {
+      // The site id is shown back in admin reports, so free text (here, HTML) must not be stored
+      const response = await request(app)
+        .post('/api/attendance/clock-in')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ guardId: testData.guardId, siteId: '<img src=x onerror=alert(1)>' })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(testDb.prepare('SELECT COUNT(*) AS c FROM attendance').get().c).toBe(0);
+    });
+
     it('should create attendance record on clock-in', async () => {
       const clockInData = {
         guardId: testData.guardId,

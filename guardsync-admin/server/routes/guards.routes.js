@@ -7,6 +7,8 @@ import { encrypt } from '../encryption.js';
 import { randomUUID } from 'crypto';
 import { guardRepo } from '../repositories/index.js';
 import { ownParam } from '../middleware/access.js';
+import { faceCheckLimiter } from '../middleware/rateLimiter.js';
+import { parseDescriptor, facesMatch } from '../utils/face.js';
 import db from '../db.js'; // Still needed for complex operations not yet migrated
 import { success, created, error, badRequest, notFound, conflict, forbidden, serverError } from '../utils/responses.js';
 import logger from '../logger.js';
@@ -143,7 +145,15 @@ router.put('/:id', authMiddleware(true, ['staff', 'admin']), validate(updateGuar
     if (!currentGuard) {
       return notFound(res, 'guard', req.params.id);
     }
-    
+
+    // An enrolment only becomes an account through the admin-only approve route, so this route
+    // cannot move a guard into or out of 'pending'. (Sending the status unchanged is fine:
+    // the dashboard sends the whole guard back when it saves an edit.)
+    if (g.status !== undefined && g.status !== currentGuard.status
+        && (currentGuard.status === 'pending' || g.status === 'pending')) {
+      return forbidden(res, 'Pending enrolments are approved or rejected with their own actions');
+    }
+
     // Merge with existing data - only update fields that are provided
     const merged = {
       name: g.name !== undefined ? g.name : currentGuard.name,
@@ -353,28 +363,53 @@ router.put('/:id/profile', authMiddleware(true, ['guard', 'staff', 'admin']), ow
 });
 
 // PUT /api/guards/:id/face - Save a guard's face descriptor (first-time enrolment)
-// A guard may enrol their own face once. Replacing an enrolled face needs staff or admin,
-// so one guard cannot re-enrol on another's behalf.
-router.put('/:id/face', authMiddleware(true, ['guard', 'staff', 'admin']), (req, res) => {
+// Only the guard can enrol, only their own face, and only once. Nobody else can set a face for
+// a guard: whoever chooses the enrolled face can log in as that guard with face login.
+router.put('/:id/face', authMiddleware(true, ['guard']), ownParam('id'), (req, res) => {
   try {
     const descriptor = req.body?.face_descriptor ?? req.body?.faceDescriptor;
-    if (typeof descriptor !== 'string' || descriptor.length < 10 || descriptor.length > 20000) {
+    if (!parseDescriptor(descriptor)) {
       return badRequest(res, 'A face descriptor is required');
     }
 
     const row = db.prepare('SELECT id, faceDescriptor FROM guards WHERE id = ?').get(req.params.id);
     if (!row) return notFound(res, 'guard', req.params.id);
+    if (row.faceDescriptor) return conflict(res, 'A face is already enrolled. Ask an admin to reset it.');
 
-    if (req.user?.role === 'guard') {
-      if (req.user.id !== req.params.id) return forbidden(res, 'Guards can only enrol their own face');
-      if (row.faceDescriptor) return conflict(res, 'A face is already enrolled. Ask your supervisor to reset it.');
-    }
-
-    guardRepo.updateFaceDescriptor(req.params.id, descriptor);
-    logger.info({ guardId: req.params.id, by: req.user?.role }, 'Guard face descriptor saved');
+    guardRepo.updateFaceDescriptor(req.params.id, typeof descriptor === 'string' ? descriptor : JSON.stringify(descriptor));
+    logger.info({ guardId: req.params.id }, 'Guard face descriptor saved');
     return success(res, { guardId: req.params.id, enrolled: true }, 200, 'Face enrolled');
   } catch (err) {
     logger.error({ err, guardId: req.params.id }, 'Failed to save face descriptor');
+    return serverError(res, String(err));
+  }
+});
+
+// DELETE /api/guards/:id/face - Reset a guard's face (admin only).
+// This clears the enrolled face; the guard then enrols again from their own phone.
+router.delete('/:id/face', authMiddleware(true, ['admin']), (req, res) => {
+  try {
+    if (!guardRepo.findById(req.params.id)) return notFound(res, 'guard', req.params.id);
+    guardRepo.updateFaceDescriptor(req.params.id, null);
+    logger.info({ guardId: req.params.id, by: req.user.id }, 'Guard face reset');
+    return success(res, { guardId: req.params.id, enrolled: false }, 200, 'Face reset. The guard will enrol again at their next check-in.');
+  } catch (err) {
+    logger.error({ err, guardId: req.params.id }, 'Failed to reset face');
+    return serverError(res, String(err));
+  }
+});
+
+// POST /api/guards/:id/face/verify - Does this scan match the guard's enrolled face?
+// The app asks here instead of comparing on the phone, so the enrolled face never has to leave the server.
+router.post('/:id/face/verify', faceCheckLimiter, authMiddleware(true, ['guard']), ownParam('id'), (req, res) => {
+  try {
+    const descriptor = req.body?.face_descriptor ?? req.body?.faceDescriptor;
+    if (!parseDescriptor(descriptor)) return badRequest(res, 'A face descriptor is required');
+    const row = db.prepare('SELECT faceDescriptor FROM guards WHERE id = ?').get(req.params.id);
+    if (!row) return notFound(res, 'guard', req.params.id);
+    if (!row.faceDescriptor) return badRequest(res, 'No face is enrolled yet');
+    return success(res, { match: facesMatch(descriptor, row.faceDescriptor) });
+  } catch (err) {
     return serverError(res, String(err));
   }
 });

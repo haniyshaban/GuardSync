@@ -85,6 +85,14 @@ export const saveFaceDescriptor = async (
   return api.put(`/guards/${guardId}/face`, { faceDescriptor });
 };
 
+/** Asks the server whether a scan matches the guard's enrolled face. The enrolled face stays on the server. */
+export const verifyFace = async (
+  guardId: string,
+  faceDescriptor: string
+): Promise<ApiResponse<{ match: boolean }>> => {
+  return api.post(`/guards/${guardId}/face/verify`, { faceDescriptor });
+};
+
 // ============ Attendance ============
 
 export const clockIn = async (
