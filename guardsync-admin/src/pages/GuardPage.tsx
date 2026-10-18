@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Guard, Site, AttendanceLog, Shift } from '@/types';
 import { API_BASE_URL } from '@/lib/utils';
-import { fetchWithAuth } from '@/lib/api';
+import { fetchJson, fetchWithAuth, getApiErrorMessage, parseApiData } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow, format, isSameDay } from 'date-fns';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -49,35 +50,74 @@ interface GuardDocuments {
   relievingLetterUrl?: string | null;
 }
 
-interface ExtendedGuard extends Guard {
+interface ExtendedGuard extends Omit<Guard, 'shiftType' | 'documents'> {
   email?: string;
   address?: string;
   emergencyContact?: string;
   dateOfJoining?: string;
   dailyRate?: number;
   aadharNumber?: string;
+  aadharNumberFull?: string | null;
   panNumber?: string;
   bankAccountNumber?: string;
   bankIfsc?: string;
   bankName?: string;
   accountHolderName?: string;
-  shiftType?: string;
+  shiftType?: 'day' | 'night' | 'rotating';
   shiftStartTime?: string;
   shiftEndTime?: string;
   documents?: GuardDocuments;
 }
+
+// The Edit Guard form. Values are strings as typed; only fields that differ from what the
+// form started with are sent. Account fields go to PUT /api/guards/:id, personal and ID/bank
+// details to PUT /api/guards/:id/profile (which encrypts them).
+const ACCOUNT_FIELDS = ['name', 'phone', 'email', 'dateOfJoining', 'dailyRate'] as const;
+const PROFILE_FIELDS = ['address', 'emergencyContact', 'aadharNumber', 'panNumber', 'bankAccountNumber', 'bankIfsc', 'bankName', 'accountHolderName'] as const;
+type GuardForm = Record<typeof ACCOUNT_FIELDS[number] | typeof PROFILE_FIELDS[number], string>;
+
+const isMasked = (value?: string | null) => !!value && /^X{4}/i.test(value);
+
+function formFromGuard(g: ExtendedGuard): GuardForm {
+  return {
+    name: g.name || '',
+    phone: g.phone || '',
+    email: g.email || '',
+    dateOfJoining: g.dateOfJoining ? String(g.dateOfJoining).slice(0, 10) : '',
+    dailyRate: g.dailyRate !== undefined && g.dailyRate !== null ? String(g.dailyRate) : '',
+    address: g.address || '',
+    emergencyContact: g.emergencyContact || '',
+    // ID and account numbers come back masked unless this login may see them in full. A masked
+    // value starts the field empty, so it can never be saved back over the real number.
+    aadharNumber: g.aadharNumberFull || (isMasked(g.aadharNumber) ? '' : g.aadharNumber || ''),
+    panNumber: isMasked(g.panNumber) ? '' : g.panNumber || '',
+    bankAccountNumber: isMasked(g.bankAccountNumber) ? '' : g.bankAccountNumber || '',
+    bankIfsc: g.bankIfsc || '',
+    bankName: g.bankName || '',
+    accountHolderName: g.accountHolderName || '',
+  };
+}
+
+// Default times for the shifts offered in the Assign Shift dialog
+const SHIFT_TIMES = {
+  day: { shiftStartTime: '06:00', shiftEndTime: '18:00' },
+  night: { shiftStartTime: '18:00', shiftEndTime: '06:00' },
+} as const;
 
 const GuardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
+  const { isAdmin } = useAuth();
   const [guard, setGuard] = useState<ExtendedGuard | null>(null);
   const [site, setSite] = useState<Site | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [attendance, setAttendance] = useState<AttendanceLog | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedGuard, setEditedGuard] = useState<Partial<ExtendedGuard>>({});
+  const [initialForm, setInitialForm] = useState<GuardForm | null>(null);
+  const [editedGuard, setEditedGuard] = useState<GuardForm>(() => formFromGuard({} as ExtendedGuard));
+  const [isSaving, setIsSaving] = useState(false);
   
   // Site assignment dialog
   const [showSiteDialog, setShowSiteDialog] = useState(false);
@@ -86,7 +126,6 @@ const GuardPage = () => {
   
   // Shift assignment dialog  
   const [showShiftDialog, setShowShiftDialog] = useState(false);
-  const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [selectedShiftType, setSelectedShiftType] = useState<'day' | 'night' | null>(null);
 
   // Delete guard dialog
@@ -111,13 +150,8 @@ const GuardPage = () => {
       try {
         const res = await fetchWithAuth(`${API_BASE_URL}/api/guards/${id}`);
         if (res.ok) {
-          const response = await res.json();
-          const data = response.data || response;
+          const data = parseApiData<ExtendedGuard>(await res.json());
           setGuard(data);
-          setEditedGuard(data);
-          setSelectedSiteId(data.siteId);
-          setSelectedShiftId(data.currentShiftId);
-          setSelectedShiftType(data.shiftType || null);
         }
       } catch (e) {
         console.log('Could not load guard from backend');
@@ -132,8 +166,8 @@ const GuardPage = () => {
       try {
         const res = await fetchWithAuth(`${API_BASE_URL}/api/sites`);
         if (res.ok) {
-          const data = await res.json();
-          setSites(Array.isArray(data) ? data : data.data || []);
+          const data = parseApiData(await res.json());
+          setSites(Array.isArray(data) ? data : []);
         }
       } catch (e) {
         console.log('Could not load sites');
@@ -150,8 +184,7 @@ const GuardPage = () => {
         const today = new Date().toISOString().slice(0, 10);
         const res = await fetchWithAuth(`${API_BASE_URL}/api/attendance?guardId=${id}&date=${today}`);
         if (res.ok) {
-          const response = await res.json();
-          const data = Array.isArray(response) ? response : (response.data || []);
+          const data = parseApiData(await res.json());
           if (Array.isArray(data) && data.length > 0) {
             setAttendance(data[0]);
           }
@@ -173,8 +206,7 @@ const GuardPage = () => {
       try {
         const res = await fetchWithAuth(`${API_BASE_URL}/api/sites/${guard.siteId}`);
         if (res.ok) {
-          const response = await res.json();
-          setSite(response.data || response);
+          setSite(parseApiData(await res.json()));
         }
       } catch (e) {
         console.log('Could not load site');
@@ -183,77 +215,122 @@ const GuardPage = () => {
     loadSite();
   }, [guard?.siteId]);
 
-  const saveGuardChanges = async () => {
+  const startEditing = () => {
     if (!guard) return;
-    try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/guards/${guard.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...guard, ...editedGuard }),
-      });
-      if (res.ok) {
-        const response = await res.json();
-        setGuard(response.data || response);
-        setIsEditing(false);
-        toast({ title: 'Guard updated', description: 'Changes saved successfully.' });
+    const form = formFromGuard(guard);
+    setInitialForm(form);
+    setEditedGuard(form);
+    setIsEditing(true);
+  };
+
+  // Cancel throws away whatever was typed, so the next Edit starts from the saved values
+  const cancelEditing = () => {
+    if (initialForm) setEditedGuard(initialForm);
+    setIsEditing(false);
+  };
+
+  const saveGuardChanges = async () => {
+    if (!guard || !initialForm) return;
+    const changed = (field: keyof GuardForm) => editedGuard[field].trim() !== initialForm[field].trim();
+
+    const account: Record<string, string | number> = {};
+    for (const field of ACCOUNT_FIELDS) {
+      if (!changed(field)) continue;
+      const value = editedGuard[field].trim();
+      if (field === 'name' || field === 'phone') {
+        if (!value) {
+          toast({ title: 'Not saved', description: `${field === 'name' ? 'Name' : 'Phone'} can't be empty.`, variant: 'destructive' });
+          return;
+        }
+        account[field] = value;
+      } else if (!value) {
+        continue; // optional fields can't be cleared, so an emptied one is left as it is
+      } else if (field === 'dailyRate') {
+        const rate = Number(value);
+        if (!Number.isFinite(rate) || rate < 0) {
+          toast({ title: 'Not saved', description: 'Daily rate must be a number of 0 or more.', variant: 'destructive' });
+          return;
+        }
+        account.dailyRate = rate;
+      } else {
+        account[field] = value;
       }
-    } catch (e) {
-      toast({ title: 'Error', description: 'Failed to save changes.', variant: 'destructive' });
     }
+
+    const profile: Record<string, string> = {};
+    for (const field of PROFILE_FIELDS) {
+      if (!changed(field)) continue;
+      let value = editedGuard[field].trim();
+      if (!value) continue; // the profile route only saves values that are filled in
+      if (field === 'aadharNumber' || field === 'bankAccountNumber') value = value.replace(/[\s-]/g, '');
+      if (field === 'panNumber' || field === 'bankIfsc') value = value.toUpperCase();
+      profile[field] = value;
+    }
+
+    if (Object.keys(account).length === 0 && Object.keys(profile).length === 0) {
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (Object.keys(account).length > 0) {
+        const updated = await fetchJson<ExtendedGuard>(`${API_BASE_URL}/api/guards/${guard.id}`, 'PUT', account);
+        setGuard(updated);
+        // These are saved now: if the profile save below fails, a retry doesn't send them again
+        setInitialForm(prev => prev && { ...prev, ...Object.fromEntries(ACCOUNT_FIELDS.map(f => [f, editedGuard[f]])) });
+      }
+      if (Object.keys(profile).length > 0) {
+        const updated = await fetchJson<ExtendedGuard>(`${API_BASE_URL}/api/guards/${guard.id}/profile`, 'PUT', profile);
+        setGuard(updated);
+      }
+      setIsEditing(false);
+      toast({ title: 'Guard updated', description: 'Changes saved successfully.' });
+    } catch (e) {
+      // Stay in edit mode with what was typed, and say why the server refused it
+      toast({ title: 'Not saved', description: e instanceof Error ? e.message : 'Failed to save changes.', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openSiteDialog = () => {
+    setSelectedSiteId(guard?.siteId ?? null);
+    setSiteSearchQuery('');
+    setShowSiteDialog(true);
   };
 
   const assignToSite = async () => {
     if (!guard) return;
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/guards/${guard.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...guard, siteId: selectedSiteId }),
-      });
-      if (res.ok) {
-        const response = await res.json();
-        setGuard(response.data || response);
-        setShowSiteDialog(false);
-        toast({ title: 'Site assigned', description: selectedSiteId ? 'Guard assigned to site.' : 'Guard unassigned from site.' });
-      }
+      // Only the assignment is sent; null unassigns the guard
+      const updated = await fetchJson<ExtendedGuard>(`${API_BASE_URL}/api/guards/${guard.id}`, 'PUT', { siteId: selectedSiteId });
+      setGuard(updated);
+      setShowSiteDialog(false);
+      toast({ title: selectedSiteId ? 'Site assigned' : 'Site unassigned', description: selectedSiteId ? 'Guard assigned to site.' : 'Guard unassigned from site.' });
     } catch (e) {
-      toast({ title: 'Error', description: 'Failed to assign site.', variant: 'destructive' });
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to assign site.', variant: 'destructive' });
     }
   };
 
+  const openShiftDialog = () => {
+    setSelectedShiftType(guard?.shiftType === 'day' || guard?.shiftType === 'night' ? guard.shiftType : null);
+    setShowShiftDialog(true);
+  };
+
   const assignShift = async () => {
-    if (!guard) return;
+    if (!guard || !selectedShiftType) return;
     try {
-      const shiftData: any = {
-        currentShiftId: selectedShiftId,
+      // Only the shift fields are sent
+      const updated = await fetchJson<ExtendedGuard>(`${API_BASE_URL}/api/guards/${guard.id}`, 'PUT', {
         shiftType: selectedShiftType,
-      };
-      
-      // Set default shift times based on shift type
-      if (selectedShiftType === 'day') {
-        shiftData.shiftStartTime = '06:00';
-        shiftData.shiftEndTime = '18:00';
-      } else if (selectedShiftType === 'night') {
-        shiftData.shiftStartTime = '18:00';
-        shiftData.shiftEndTime = '06:00';
-      } else {
-        shiftData.shiftStartTime = null;
-        shiftData.shiftEndTime = null;
-      }
-      
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/guards/${guard.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...guard, ...shiftData }),
+        ...SHIFT_TIMES[selectedShiftType],
       });
-      if (res.ok) {
-        const response = await res.json();
-        setGuard(response.data || response);
-        setShowShiftDialog(false);
-        toast({ title: 'Shift assigned', description: 'Guard shift updated.' });
-      }
+      setGuard(updated);
+      setShowShiftDialog(false);
+      toast({ title: 'Shift assigned', description: 'Guard shift updated.' });
     } catch (e) {
-      toast({ title: 'Error', description: 'Failed to assign shift.', variant: 'destructive' });
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to assign shift.', variant: 'destructive' });
     }
   };
 
@@ -273,9 +350,8 @@ const GuardPage = () => {
         toast({ title: 'Guard deleted', description: data.message || `${guard.name} has been removed from the system.` });
         navigate('/guards');
       } else {
-        const data = await res.json();
-        const errorMessage = data.error?.message || data.error || 'Failed to delete guard';
-        throw new Error(errorMessage);
+        const data = await res.json().catch(() => null);
+        throw new Error(getApiErrorMessage(data, 'Failed to delete guard'));
       }
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to delete guard.', variant: 'destructive' });
@@ -294,7 +370,7 @@ const GuardPage = () => {
     try {
       const res = await fetchWithAuth(`${API_BASE_URL}/api/guards/${guard.id}/face`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error?.message || 'Failed to reset face');
+      if (!res.ok) throw new Error(getApiErrorMessage(data, 'Failed to reset face'));
       setGuard({ ...guard, faceEnrolled: false });
       toast({ title: 'Face reset', description: data.message || `${guard.name} will enrol again at their next check-in.` });
     } catch (e) {
@@ -327,9 +403,8 @@ const GuardPage = () => {
           description: data.message || `${guard.name} has been approved and is now ${data.data.guard.status}.` 
         });
       } else {
-        const data = await res.json();
-        const errorMessage = data.error?.message || data.error || 'Failed to approve guard';
-        throw new Error(errorMessage);
+        const data = await res.json().catch(() => null);
+        throw new Error(getApiErrorMessage(data, 'Failed to approve guard'));
       }
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to approve guard.', variant: 'destructive' });
@@ -356,9 +431,8 @@ const GuardPage = () => {
         });
         navigate('/guards');
       } else {
-        const data = await res.json();
-        const errorMessage = data.error?.message || data.error || 'Failed to reject guard';
-        throw new Error(errorMessage);
+        const data = await res.json().catch(() => null);
+        throw new Error(getApiErrorMessage(data, 'Failed to reject guard'));
       }
     } catch (e) {
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to reject guard.', variant: 'destructive' });
@@ -454,7 +528,10 @@ const GuardPage = () => {
                 Missed Check-in
               </Badge>
             )}
-            {guard.status === 'pending' ? (
+            {guard.status === 'pending' && !isAdmin ? (
+              // Only an admin can approve or reject an enrolment
+              <Badge variant="pending">Awaiting admin approval</Badge>
+            ) : guard.status === 'pending' ? (
               // Show approval buttons for pending guards
               <>
                 <Button 
@@ -476,17 +553,17 @@ const GuardPage = () => {
               </>
             ) : isEditing ? (
               <>
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <Button variant="outline" onClick={cancelEditing} disabled={isSaving}>
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </Button>
-                <Button onClick={saveGuardChanges}>
+                <Button onClick={saveGuardChanges} disabled={isSaving}>
                   <Save className="w-4 h-4 mr-2" />
-                  Save Changes
+                  {isSaving ? 'Saving...' : 'Save Changes'}
                 </Button>
               </>
             ) : (
-              <Button variant="outline" onClick={() => setIsEditing(true)}>
+              <Button variant="outline" onClick={startEditing}>
                 <Edit2 className="w-4 h-4 mr-2" />
                 Edit Guard
               </Button>
@@ -533,7 +610,7 @@ const GuardPage = () => {
                         </p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setShowSiteDialog(true)}>
+                    <Button variant="outline" size="sm" onClick={openSiteDialog}>
                       {site ? 'Change' : 'Assign'}
                     </Button>
                   </div>
@@ -558,7 +635,7 @@ const GuardPage = () => {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => setShowShiftDialog(true)}
+                      onClick={openShiftDialog}
                     >
                       {shiftInfo ? 'Change' : 'Assign'}
                     </Button>
@@ -684,7 +761,7 @@ const GuardPage = () => {
                         value={editedGuard.aadharNumber || ''} 
                         onChange={(e) => setEditedGuard({...editedGuard, aadharNumber: e.target.value})}
                         className="mt-1"
-                        placeholder="XXXX XXXX XXXX"
+                        placeholder={guard.aadharNumber ? `${guard.aadharNumber} (type the full number to change)` : 'XXXX XXXX XXXX'}
                       />
                     ) : (
                       <p className="font-medium font-mono">
@@ -699,7 +776,7 @@ const GuardPage = () => {
                         value={editedGuard.panNumber || ''} 
                         onChange={(e) => setEditedGuard({...editedGuard, panNumber: e.target.value})}
                         className="mt-1"
-                        placeholder="ABCDE1234F"
+                        placeholder={guard.panNumber ? `${guard.panNumber} (type the full number to change)` : 'ABCDE1234F'}
                       />
                     ) : (
                       <p className="font-medium font-mono">
@@ -873,6 +950,7 @@ const GuardPage = () => {
                         value={editedGuard.bankAccountNumber || ''} 
                         onChange={(e) => setEditedGuard({...editedGuard, bankAccountNumber: e.target.value})}
                         className="mt-1"
+                        placeholder={guard.bankAccountNumber ? '' : 'Type the full number to change'}
                       />
                     ) : (
                       <p className="font-medium font-mono">
@@ -897,8 +975,9 @@ const GuardPage = () => {
                     {isEditing ? (
                       <Input 
                         type="number"
-                        value={editedGuard.dailyRate || ''} 
-                        onChange={(e) => setEditedGuard({...editedGuard, dailyRate: Number(e.target.value)})}
+                        min={0}
+                        value={editedGuard.dailyRate}
+                        onChange={(e) => setEditedGuard({...editedGuard, dailyRate: e.target.value})}
                         className="mt-1"
                       />
                     ) : (
@@ -1018,7 +1097,8 @@ const GuardPage = () => {
           </div>
         </div>
 
-        {/* Danger Zone */}
+        {/* Danger Zone (admin-only actions) */}
+        {isAdmin && (
         <div className="mt-8">
           <Card className="border-red-200">
             <CardHeader>
@@ -1069,6 +1149,7 @@ const GuardPage = () => {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
 
       {/* Site Assignment Dialog */}
@@ -1147,19 +1228,6 @@ const GuardPage = () => {
           </DialogHeader>
           
           <div className="space-y-3">
-            {/* No Shift option */}
-            <div
-              onClick={() => setSelectedShiftType(null)}
-              className={`p-4 rounded-lg cursor-pointer transition-colors ${
-                selectedShiftType === null 
-                  ? 'bg-primary/10 border-2 border-primary' 
-                  : 'bg-muted/50 hover:bg-muted border-2 border-transparent'
-              }`}
-            >
-              <p className="font-medium">No Shift</p>
-              <p className="text-xs text-muted-foreground">Remove shift assignment</p>
-            </div>
-            
             {/* Day Shift option */}
             <div
               onClick={() => setSelectedShiftType('day')}
@@ -1207,7 +1275,7 @@ const GuardPage = () => {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowShiftDialog(false)}>Cancel</Button>
-            <Button onClick={assignShift}>
+            <Button onClick={assignShift} disabled={!selectedShiftType}>
               Assign
             </Button>
           </DialogFooter>
