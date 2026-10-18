@@ -422,12 +422,9 @@ export const updateGuardLocation = async (
 };
 
 // ============ File Upload ============
-
-export const uploadFile = async (file: File): Promise<ApiResponse<{ url: string }>> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  return api.uploadFile('/upload', formData);
-};
+// There is no upload call here on purpose. The server's upload route is POST /uploads (outside
+// /api) and needs a login, so an enrolling guard, who has no account yet, cannot upload; the
+// old call went to /api/upload, which does not exist, and every file was silently dropped.
 
 // Export as namespace
 export const GuardAPI = {
@@ -462,7 +459,6 @@ export const GuardAPI = {
   getSchedules,
   sendSOSAlert,
   updateGuardLocation,
-  uploadFile,
 };
 
 export default GuardAPI;

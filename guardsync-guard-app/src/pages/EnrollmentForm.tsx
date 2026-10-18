@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, Upload, CheckCircle, Loader2, 
+import {
+  ArrowLeft, CheckCircle, Loader2, FileText, Lock, LogOut,
   User, CreditCard, Building, Phone, Mail, MapPin, Camera, Scan
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
 import { FacialScanner } from '@/components/FacialScanner';
 import { descriptorToString } from '@/services/FaceApiService';
-import { uploadFile } from '@/services/GuardAPI';
+import { errorMessage } from '@/lib/apiError';
 
 type EnrollmentStep = 'personal' | 'face' | 'documents' | 'success';
 
@@ -22,6 +22,8 @@ interface FormData {
   fullName: string;
   email: string;
   phone: string;
+  password: string;
+  confirmPassword: string;
   address: string;
   emergencyContact: string;
   aadharNumber: string;
@@ -32,26 +34,20 @@ interface FormData {
   accountHolderName: string;
 }
 
-interface FileUploads {
-  photograph: File | null;
-  aadharDoc: File | null;
-  panDoc: File | null;
-  relievingLetter: File | null;
-}
-
 export default function EnrollmentForm() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { guard, updateGuard } = useAuth();
+  const { guard, logout } = useAuth();
 
   const [step, setStep] = useState<EnrollmentStep>('personal');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form data - prepopulated from guard data if available
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     email: '',
     phone: '',
+    password: '',
+    confirmPassword: '',
     address: '',
     emergencyContact: '',
     aadharNumber: '',
@@ -62,39 +58,6 @@ export default function EnrollmentForm() {
     accountHolderName: '',
   });
 
-  // Prepopulate form with existing guard data
-  useEffect(() => {
-    if (guard) {
-      setFormData(prev => ({
-        ...prev,
-        fullName: guard.name || prev.fullName,
-        email: guard.email || prev.email,
-        phone: guard.phone || prev.phone,
-        address: guard.address || prev.address,
-        emergencyContact: guard.emergencyContact || prev.emergencyContact,
-        aadharNumber: guard.documents?.aadharNumber || prev.aadharNumber,
-        panNumber: guard.documents?.panNumber || prev.panNumber,
-        bankAccountNumber: guard.bankDetails?.accountNumber || prev.bankAccountNumber,
-        bankIfsc: guard.bankDetails?.ifsc || prev.bankIfsc,
-        bankName: guard.bankDetails?.bankName || prev.bankName,
-        accountHolderName: guard.bankDetails?.accountHolderName || prev.accountHolderName,
-      }));
-    }
-  }, [guard]);
-
-  // File uploads
-  const [files, setFiles] = useState<FileUploads>({
-    photograph: null,
-    aadharDoc: null,
-    panDoc: null,
-    relievingLetter: null,
-  });
-
-  const photographRef = useRef<HTMLInputElement>(null);
-  const aadharDocRef = useRef<HTMLInputElement>(null);
-  const panDocRef = useRef<HTMLInputElement>(null);
-  const relievingLetterRef = useRef<HTMLInputElement>(null);
-
   // Face capture state
   const [showFaceCapture, setShowFaceCapture] = useState(false);
   const [faceDescriptor, setFaceDescriptor] = useState<string | null>(null);
@@ -102,10 +65,6 @@ export default function EnrollmentForm() {
 
   const updateFormData = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleFileChange = (field: keyof FileUploads, file: File | null) => {
-    setFiles(prev => ({ ...prev, [field]: file }));
   };
 
   // Aadhar Validation
@@ -123,16 +82,34 @@ export default function EnrollmentForm() {
   // Validate current step
   const validateStep = (currentStep: EnrollmentStep): boolean => {
     switch (currentStep) {
-      case 'personal':
-        if (!formData.fullName || !formData.email || !formData.phone) {
-          toast({
-            title: 'Missing Information',
-            description: 'Please fill in all required fields',
-            variant: 'destructive',
-          });
+      case 'personal': {
+        const fail = (title: string, description: string) => {
+          toast({ title, description, variant: 'destructive' });
           return false;
+        };
+        if (!formData.fullName.trim() || !formData.email.trim() || !formData.phone.trim()) {
+          return fail('Missing Information', 'Please fill in all required fields');
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+          return fail('Invalid Email', 'Please enter a valid email address');
+        }
+        const phoneLength = formData.phone.trim().length;
+        if (phoneLength < 10 || phoneLength > 15) {
+          return fail('Invalid Phone Number', 'Phone number must be 10 to 15 characters');
+        }
+        const emergencyLength = formData.emergencyContact.trim().length;
+        if (emergencyLength > 0 && (emergencyLength < 10 || emergencyLength > 15)) {
+          return fail('Invalid Emergency Contact', 'Emergency contact must be 10 to 15 characters');
+        }
+        // The password is how the guard signs in once approved
+        if (formData.password.length < 8) {
+          return fail('Password Too Short', 'Choose a password of at least 8 characters');
+        }
+        if (formData.password !== formData.confirmPassword) {
+          return fail('Passwords Do Not Match', 'Please type the same password twice');
         }
         return true;
+      }
 
       case 'face':
         if (!isFaceCaptured || !faceDescriptor) {
@@ -170,6 +147,22 @@ export default function EnrollmentForm() {
           });
           return false;
         }
+        if (!/^\d{9,18}$/.test(formData.bankAccountNumber.replace(/\s/g, ''))) {
+          toast({
+            title: 'Invalid Account Number',
+            description: 'Account number must be 9 to 18 digits',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.bankIfsc.trim().toUpperCase())) {
+          toast({
+            title: 'Invalid IFSC',
+            description: 'Please enter a valid IFSC code (for example SBIN0001234)',
+            variant: 'destructive',
+          });
+          return false;
+        }
         return true;
 
       default:
@@ -189,22 +182,6 @@ export default function EnrollmentForm() {
   const handlePreviousStep = () => {
     if (step === 'face') setStep('personal');
     else if (step === 'documents') setStep('face');
-  };
-
-  // Upload a single file and return the URL
-  const uploadSingleFile = async (file: File, fieldName: string): Promise<string | null> => {
-    try {
-      const response = await uploadFile(file);
-      
-      if (!response.success || !response.data) {
-        throw new Error(response.error || 'Upload failed');
-      }
-      
-      return response.data.url;
-    } catch (error) {
-      console.error(`Failed to upload ${fieldName}:`, error);
-      return null;
-    }
   };
 
   // Handle face capture complete
@@ -229,124 +206,79 @@ export default function EnrollmentForm() {
 
   // Final submission
   const handleSubmit = async () => {
-    if (!faceDescriptor) {
-      toast({
-        title: 'Face Capture Required',
-        description: 'Please capture your face before submitting',
-        variant: 'destructive',
-      });
+    // Check every step again, so nothing invalid is sent
+    if (!validateStep('personal')) {
+      setStep('personal');
       return;
     }
+    if (!validateStep('face')) {
+      setStep('face');
+      return;
+    }
+    if (!validateStep('documents')) return;
+
+    // Only fields that were filled in are sent.
+    // Documents are not uploaded: uploading needs a login, which a new guard does not have yet.
+    // The success screen tells the guard that their supervisor collects them.
+    const optional = (value: string) => (value.trim() ? value.trim() : undefined);
+    const body = {
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      password: formData.password,
+      address: optional(formData.address),
+      emergencyContact: optional(formData.emergencyContact),
+      aadharNumber: formData.aadharNumber.replace(/\D/g, ''),
+      panNumber: formData.panNumber.trim().toUpperCase(),
+      bankAccountNumber: formData.bankAccountNumber.replace(/\s/g, ''),
+      bankIfsc: formData.bankIfsc.trim().toUpperCase(),
+      bankName: formData.bankName.trim(),
+      accountHolderName: optional(formData.accountHolderName),
+      faceDescriptor,
+    };
 
     setIsSubmitting(true);
     try {
-      // Upload files first
-      let photographUrl = null;
-      let aadharDocUrl = null;
-      let panDocUrl = null;
-      let relievingLetterUrl = null;
-
-      if (files.photograph) {
-        photographUrl = await uploadSingleFile(files.photograph, 'photograph');
+      const response = await api.post('/guards/enroll', body);
+      if (!response.success) {
+        throw new Error(errorMessage(response.error, 'Could not submit your enrolment. Please try again.'));
       }
-      if (files.aadharDoc) {
-        aadharDocUrl = await uploadSingleFile(files.aadharDoc, 'aadharDoc');
-      }
-      if (files.panDoc) {
-        panDocUrl = await uploadSingleFile(files.panDoc, 'panDoc');
-      }
-      if (files.relievingLetter) {
-        relievingLetterUrl = await uploadSingleFile(files.relievingLetter, 'relievingLetter');
-      }
-
-      if (guard?.id) {
-        // Existing guard - Update profile
-        const response = await api.put(`/guards/${guard.id}/profile`, {
-          address: formData.address,
-          emergencyContact: formData.emergencyContact,
-          aadharNumber: formData.aadharNumber.replace(/\D/g, ''), // Remove formatting
-          panNumber: formData.panNumber.toUpperCase(),
-          bankAccountNumber: formData.bankAccountNumber,
-          bankIfsc: formData.bankIfsc.toUpperCase(),
-          bankName: formData.bankName,
-          accountHolderName: formData.accountHolderName,
-          faceDescriptor: faceDescriptor,
-          photographUrl,
-          aadharDocUrl,
-          panDocUrl,
-          relievingLetterUrl,
-        });
-
-        if (response.success) {
-          // Update local guard state with new data
-          updateGuard({
-            address: formData.address,
-            emergencyContact: formData.emergencyContact,
-            documents: {
-              ...guard.documents,
-              aadharNumber: formData.aadharNumber,
-              panNumber: formData.panNumber,
-            },
-            bankDetails: {
-              accountNumber: formData.bankAccountNumber,
-              ifsc: formData.bankIfsc,
-              bankName: formData.bankName,
-              accountHolderName: formData.accountHolderName,
-            },
-          });
-          toast({
-            title: 'Profile Updated',
-            description: 'Your details have been saved successfully.',
-          });
-        } else {
-          throw new Error(response.error || 'Failed to update profile');
-        }
-      } else {
-        // New guard - Create enrollment
-        const response = await api.post('/guards/enroll', {
-          fullName: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          emergencyContact: formData.emergencyContact,
-          aadharNumber: formData.aadharNumber.replace(/\D/g, ''),
-          panNumber: formData.panNumber.toUpperCase(),
-          bankAccountNumber: formData.bankAccountNumber,
-          bankIfsc: formData.bankIfsc.toUpperCase(),
-          bankName: formData.bankName,
-          accountHolderName: formData.accountHolderName,
-          faceDescriptor: faceDescriptor,
-          photographUrl,
-          aadharDocUrl,
-          panDocUrl,
-          relievingLetterUrl,
-        });
-
-        if (response.success) {
-          toast({
-            title: 'Enrollment Submitted',
-            description: 'Your enrollment has been submitted. You will be notified once approved.',
-          });
-        } else {
-          throw new Error(response.error || 'Failed to submit enrollment');
-        }
-      }
-
-      console.log('Enrollment Data:', formData);
-      console.log('Files:', files);
-
       setStep('success');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Please try again.';
       toast({
         title: 'Submission Failed',
-        description: errorMessage,
+        description: errorMessage(error, 'Could not submit your enrolment. Please try again.'),
         variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Enrolment creates a new guard. Someone who is signed in must sign out first; otherwise the
+  // form would be mixed up with their own account.
+  if (guard) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="glass-card p-6 w-full max-w-sm text-center">
+          <User className="w-10 h-10 text-primary mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-foreground mb-2">You are signed in</h1>
+          <p className="text-sm text-muted-foreground mb-6">
+            You are signed in as {guard.name}. To enrol a new guard on this phone, sign out first.
+          </p>
+          <div className="space-y-3">
+            <Button variant="gradient" className="w-full" onClick={logout}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign out and enrol
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/dashboard')}>
+              Back to dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Success Screen
   if (step === 'success') {
@@ -358,19 +290,19 @@ export default function EnrollmentForm() {
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Enrollment Submitted!</h1>
           <p className="text-muted-foreground mb-6">
-            Your details are being reviewed. You'll be notified once verified.
+            Your details are being reviewed. Once an admin approves them, sign in with your email and password.
           </p>
-          <div className="glass-card p-5 w-full max-w-sm mb-6">
+          <div className="glass-card p-5 w-full max-w-sm mb-6 text-left">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Status</span>
-                <span className="font-medium text-warning">Pending Verification</span>
+                <span className="font-medium text-warning">Pending Approval</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Aadhar</span>
-                <span className="font-medium text-primary flex items-center gap-1">
-                  <CheckCircle className="w-4 h-4" />
-                  Verified
+              <div className="flex items-start gap-2 text-sm">
+                <FileText className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <span className="text-muted-foreground">
+                  Your documents were not sent from the app. Your supervisor will collect copies of your
+                  Aadhaar card, PAN card, a photo and your relieving letter (if you have one).
                 </span>
               </div>
             </div>
@@ -400,15 +332,13 @@ export default function EnrollmentForm() {
           {step === 'personal' && 'Step 1: Personal Information'}
           {step === 'face' && 'Step 2: Face Enrollment'}
           {step === 'documents' && 'Step 3: Documents & Bank Details'}
-          {step === 'verification' && 'Step 4: Aadhar Verification'}
         </p>
 
         {/* Progress Bar */}
         <div className="flex gap-2 mt-4">
-          <div className={`h-1 flex-1 rounded-full ${['personal', 'face', 'documents', 'verification'].includes(step) ? 'gradient-primary' : 'bg-secondary'}`} />
-          <div className={`h-1 flex-1 rounded-full ${['face', 'documents', 'verification'].includes(step) ? 'gradient-primary' : 'bg-secondary'}`} />
-          <div className={`h-1 flex-1 rounded-full ${['documents', 'verification'].includes(step) ? 'gradient-primary' : 'bg-secondary'}`} />
-          <div className={`h-1 flex-1 rounded-full ${step === 'verification' ? 'gradient-primary' : 'bg-secondary'}`} />
+          <div className="h-1 flex-1 rounded-full gradient-primary" />
+          <div className={`h-1 flex-1 rounded-full ${['face', 'documents'].includes(step) ? 'gradient-primary' : 'bg-secondary'}`} />
+          <div className={`h-1 flex-1 rounded-full ${step === 'documents' ? 'gradient-primary' : 'bg-secondary'}`} />
         </div>
       </div>
 
@@ -475,6 +405,43 @@ export default function EnrollmentForm() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password *</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type="password"
+                        autoComplete="new-password"
+                        value={formData.password}
+                        onChange={(e) => updateFormData('password', e.target.value)}
+                        placeholder="At least 8 characters"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        autoComplete="new-password"
+                        value={formData.confirmPassword}
+                        onChange={(e) => updateFormData('confirmPassword', e.target.value)}
+                        placeholder="Type it again"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  You will sign in with your email and this password once your enrolment is approved.
+                </p>
+
                 <div className="space-y-2">
                   <Label htmlFor="address">Address</Label>
                   <div className="relative">
@@ -497,42 +464,6 @@ export default function EnrollmentForm() {
                     onChange={(e) => updateFormData('emergencyContact', e.target.value)}
                     placeholder="Emergency contact number"
                   />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Photo Upload */}
-            <Card className="glass-card border-0">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-primary" />
-                  Profile Photo
-                </CardTitle>
-                <CardDescription>Upload a clear photo of yourself</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <input
-                  type="file"
-                  ref={photographRef}
-                  accept="image/*"
-                  onChange={(e) => handleFileChange('photograph', e.target.files?.[0] || null)}
-                  className="hidden"
-                />
-                <div
-                  onClick={() => photographRef.current?.click()}
-                  className="border-2 border-dashed border-secondary rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
-                >
-                  {files.photograph ? (
-                    <div className="flex items-center justify-center gap-2 text-primary">
-                      <CheckCircle className="w-5 h-5" />
-                      <span>{files.photograph.name}</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">Click to upload photo</p>
-                    </>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -645,30 +576,6 @@ export default function EnrollmentForm() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Aadhar Document</Label>
-                  <input
-                    type="file"
-                    ref={aadharDocRef}
-                    accept="image/*,application/pdf"
-                    onChange={(e) => handleFileChange('aadharDoc', e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                  <div
-                    onClick={() => aadharDocRef.current?.click()}
-                    className="border-2 border-dashed border-secondary rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors"
-                  >
-                    {files.aadharDoc ? (
-                      <div className="flex items-center justify-center gap-2 text-primary">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="text-sm">{files.aadharDoc.name}</span>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Upload Aadhar copy</p>
-                    )}
-                  </div>
-                </div>
-
                 <Separator />
 
                 <div className="space-y-2">
@@ -680,30 +587,6 @@ export default function EnrollmentForm() {
                     placeholder="ABCDE1234F"
                     maxLength={10}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>PAN Document</Label>
-                  <input
-                    type="file"
-                    ref={panDocRef}
-                    accept="image/*,application/pdf"
-                    onChange={(e) => handleFileChange('panDoc', e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                  <div
-                    onClick={() => panDocRef.current?.click()}
-                    className="border-2 border-dashed border-secondary rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors"
-                  >
-                    {files.panDoc ? (
-                      <div className="flex items-center justify-center gap-2 text-primary">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="text-sm">{files.panDoc.name}</span>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Upload PAN copy</p>
-                    )}
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -762,37 +645,18 @@ export default function EnrollmentForm() {
               </CardContent>
             </Card>
 
-            {/* Relieving Letter */}
+            {/* Documents are collected by the supervisor */}
             <Card className="glass-card border-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-primary" />
-                  Relieving Letter (Optional)
+                  <FileText className="w-5 h-5 text-primary" />
+                  Document Copies
                 </CardTitle>
-                <CardDescription>From previous employer if applicable</CardDescription>
+                <CardDescription>
+                  Copies can't be sent from this form. After you enrol, your supervisor will collect copies of your
+                  Aadhaar card, PAN card, a photo and your relieving letter (if you have one).
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <input
-                  type="file"
-                  ref={relievingLetterRef}
-                  accept="image/*,application/pdf"
-                  onChange={(e) => handleFileChange('relievingLetter', e.target.files?.[0] || null)}
-                  className="hidden"
-                />
-                <div
-                  onClick={() => relievingLetterRef.current?.click()}
-                  className="border-2 border-dashed border-secondary rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors"
-                >
-                  {files.relievingLetter ? (
-                    <div className="flex items-center justify-center gap-2 text-primary">
-                      <CheckCircle className="w-4 h-4" />
-                      <span className="text-sm">{files.relievingLetter.name}</span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Upload relieving letter</p>
-                  )}
-                </div>
-              </CardContent>
             </Card>
 
             {/* Enrollment Summary */}
@@ -831,12 +695,6 @@ export default function EnrollmentForm() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Bank</span>
                   <span className="font-medium">{formData.bankName || 'Not provided'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Documents</span>
-                  <span className="font-medium">
-                    {[files.photograph, files.aadharDoc, files.panDoc, files.relievingLetter].filter(Boolean).length} uploaded
-                  </span>
                 </div>
               </CardContent>
             </Card>

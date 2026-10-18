@@ -113,9 +113,14 @@ export default function Login() {
           </form>
         </div>
 
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Having trouble? Contact your supervisor
-        </p>
+        <div className="text-center mt-6">
+          <Button variant="link" type="button" onClick={() => navigate('/enroll')}>
+            New guard? Enrol here
+          </Button>
+          <p className="text-sm text-muted-foreground mt-1">
+            Having trouble? Contact your supervisor
+          </p>
+        </div>
       </div>
     </div>
   );
