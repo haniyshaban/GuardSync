@@ -48,19 +48,31 @@ export function FacialScanner({
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [matchDistance, setMatchDistance] = useState<number | null>(null);
+  // The camera stream, kept in a ref too so it can be stopped when the scanner closes
+  const streamRef = useRef<MediaStream | null>(null);
+  const unmountedRef = useRef(false);
 
   useEffect(() => {
     startCamera();
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      unmountedRef.current = true;
+      streamRef.current?.getTracks().forEach(track => track.stop());
     };
   }, []);
+
+  // While a message is shown the video element is replaced; give the new one the camera stream
+  useEffect(() => {
+    if (videoRef.current && stream && videoRef.current.srcObject !== stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, status]);
 
   const startCamera = async () => {
     setStatus('initializing');
     setErrorMessage('');
+    // A retry starts a new stream; turn the old one off
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
     
     // Check if models are loaded - if not, wait a bit for them
     if (!areModelsLoaded()) {
@@ -83,6 +95,12 @@ export function FacialScanner({
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 640, height: 480 }
       });
+      // Closed while the camera was starting
+      if (unmountedRef.current) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -176,10 +194,21 @@ export function FacialScanner({
           }
         }
         
-        // Single guard: the server compares when it can, so the enrolled face stays there
-        const isMatch = verifyDescriptor
-          ? await verifyDescriptor(descriptor)
-          : !!storedDescriptor && descriptorsMatch(descriptor, stringToDescriptor(storedDescriptor), matchThreshold);
+        // Single guard: the server compares when it can, so the enrolled face stays there.
+        // If the check itself fails (no connection, too many attempts), say why instead of "no match".
+        let isMatch: boolean;
+        try {
+          isMatch = verifyDescriptor
+            ? await verifyDescriptor(descriptor)
+            : !!storedDescriptor && descriptorsMatch(descriptor, stringToDescriptor(storedDescriptor), matchThreshold);
+        } catch (verifyError) {
+          setProgress(100);
+          setStatus('error');
+          setErrorMessage(verifyError instanceof Error && verifyError.message
+            ? verifyError.message
+            : 'Could not check your face. Please try again.');
+          return;
+        }
 
         if (isMatch) {
           setProgress(100);

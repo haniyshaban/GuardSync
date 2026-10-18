@@ -45,7 +45,9 @@ export default function CheckIn() {
   const verifyOwnFace = async (descriptor: Float32Array) => {
     if (!guard?.id) return false;
     const result = await verifyFace(guard.id, descriptorToString(descriptor));
-    return result.success && result.data?.match === true;
+    // A failed request is not a "no match": the scanner shows the server's reason
+    if (!result.success) throw new Error(errorMessage(result.error, 'Could not check your face. Please try again.'));
+    return result.data?.match === true;
   };
 
   const handleScanComplete = async (success: boolean, descriptor?: Float32Array) => {
