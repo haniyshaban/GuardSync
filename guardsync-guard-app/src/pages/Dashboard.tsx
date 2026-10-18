@@ -238,6 +238,8 @@ export default function Dashboard() {
     setWakeAlertLogs(prev => [...prev, log]);
     setWakeAlertActive(false);
     setWakeAlertTriggeredAt(null);
+    // Time is up, so close the face scanner too if it is still open
+    setShowWakeFaceVerify(false);
 
     toast({
       title: 'Alert Missed!',
@@ -535,9 +537,16 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Wake Alert Dialog */}
-      <Dialog open={wakeAlertActive} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+      {/* Wake Alert Dialog. The check must be answered, so it has no close button. It steps aside
+          while the face scanner is open (a modal dialog on top would block the scanner) and
+          comes back after the scan; the countdown keeps running meanwhile. */}
+      <Dialog open={wakeAlertActive && !showWakeFaceVerify} onOpenChange={() => {}}>
+        <DialogContent
+          className="sm:max-w-md"
+          hideClose
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-warning">
               <Bell className="w-6 h-6 animate-pulse" />
