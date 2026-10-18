@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import { commonSchemas } from './index.js';
 
-// Login schemas
+// Login schemas. The password only has to be present: a short wrong password gets the same
+// 'Invalid email or password' as any other wrong password. (New passwords have their own rules.)
 export const loginSchema = z.object({
   email: commonSchemas.email,
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 export const staffLoginSchema = z.object({
   email: commonSchemas.email,
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 export const faceLoginSchema = z.object({

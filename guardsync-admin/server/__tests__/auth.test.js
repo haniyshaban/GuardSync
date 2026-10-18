@@ -82,6 +82,33 @@ describe('Auth API Tests', () => {
       expect(response.body.error.message).toContain('Invalid email or password');
     });
 
+    it('should return 401 for a short wrong password, like any wrong password', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: testData.guardEmail, password: 'wrong' })
+        .expect(401);
+
+      expect(response.body.error.message).toBe('Invalid email or password');
+    });
+
+    it('should return 401 for a short wrong staff password', async () => {
+      const response = await request(app)
+        .post('/api/staff/login')
+        .send({ email: testData.adminEmail, password: 'wrong' })
+        .expect(401);
+
+      expect(response.body.error.message).toBe('Invalid email or password');
+    });
+
+    it('should return 400 with an empty password', async () => {
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send({ email: testData.guardEmail, password: '' })
+        .expect(400);
+
+      expect(response.body.error.message).toBe('password: Password is required');
+    });
+
     it('should return 400 with missing email field', async () => {
       const response = await request(app)
         .post('/api/auth/login')
