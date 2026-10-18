@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Send, Inbox, CheckCircle, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { API_BASE_URL } from '@/lib/utils';
-import { fetchWithAuth, parseApiData } from '@/lib/api';
+import { fetchJson, fetchWithAuth, parseApiData } from '@/lib/api';
 
 interface SupportTicket {
   id: string;
@@ -65,16 +65,9 @@ export default function SupportPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/support-tickets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, subject, message }),
-      });
-
-      if (!res.ok) throw new Error('Failed to submit');
-
-      const ticket = await res.json();
-      setTickets(prev => [ticket, ...prev]);
+      // The reply is {success, data: ticket}; only the ticket goes into the list
+      const ticket = await fetchJson<SupportTicket>(`${API_BASE_URL}/api/support-tickets`, 'POST', { name, email, subject, message });
+      if (ticket && ticket.id) setTickets(prev => [ticket, ...prev]);
       setName(''); setEmail(''); setSubject(''); setMessage('');
       
       toast({
@@ -85,7 +78,7 @@ export default function SupportPage() {
       console.error('Submit failed:', err);
       toast({
         title: 'Submission failed',
-        description: 'Could not submit ticket. Please try again.',
+        description: err instanceof Error ? err.message : 'Could not submit ticket. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -188,7 +181,7 @@ export default function SupportPage() {
                         </div>
                         <p className="text-sm text-muted-foreground">{ticket.message}</p>
                         <p className="text-xs text-muted-foreground mt-2">
-                          Submitted {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
+                          Submitted {ticket.createdAt && !isNaN(Date.parse(ticket.createdAt)) ? formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true }) : 'just now'}
                         </p>
                         {ticket.response && (
                           <div className="mt-3 p-3 bg-muted/30 rounded-lg">
