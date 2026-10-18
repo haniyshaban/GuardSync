@@ -14,8 +14,16 @@ import { MapContainer, TileLayer, Marker, Polygon, Circle, useMapEvents } from '
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { API_BASE_URL } from '@/lib/utils';
-import { fetchWithAuth } from '@/lib/api';
+import { fetchJson, fetchWithAuth, getApiErrorMessage, parseApiData } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { Guard } from '@/types';
+
+// Map center when a site has no stored location
+const FALLBACK_CENTER: [number, number] = [12.97, 77.59];
+
+const toPolygon = (points: unknown): { lat: number; lng: number }[] =>
+  Array.isArray(points) ? points.map((p: { lat?: unknown; lng?: unknown }) => ({ lat: Number(p?.lat), lng: Number(p?.lng) })) : [];
 
 interface PatrolCheckpoint {
   id: string;
@@ -30,8 +38,12 @@ export default function ManageSitePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const siteId = String(id || '');
+  const { isAdmin } = useAuth();
+  const { toast } = useToast();
 
   const [site, setSite] = useState<any>(null);
+  const [isLoadingSite, setIsLoadingSite] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
   const [isActive, setIsActive] = useState<boolean>(true);
   const [assignedGuardIds, setAssignedGuardIds] = useState<string[]>([]);
@@ -56,47 +68,65 @@ export default function ManageSitePage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
+  // Replies are {success, data}; parseApiData unwraps them
+  async function loadGuards() {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/guards`);
+      if (res.ok) {
+        const data = parseApiData(await res.json());
+        if (Array.isArray(data)) {
+          setAllGuards(data);
+        }
+      }
+    } catch (e) {
+      console.log('Could not load guards from backend', e);
+    }
+  }
+
+  // Puts a site from the server into the page's state (on load and after a save)
+  function applySite(data: any) {
+    setSite(data);
+    setName(data.name || '');
+    setIsActive(!!data.isActive);
+    setAssignedGuardIds(Array.isArray(data.assignedGuards) ? data.assignedGuards.slice() : []);
+    setGeofenceMode(data.geofenceType === 'polygon' ? 'polygon' : 'radius');
+    setRadiusValue(data.geofenceRadius || 100);
+    setPolygonText(data.geofencePolygon ? JSON.stringify(data.geofencePolygon, null, 2) : '');
+    setPolygonPoints(toPolygon(data.geofencePolygon));
+    setPatrolCheckpoints(Array.isArray(data.patrolRoute) ? data.patrolRoute : []);
+  }
+
   // Fetch all guards from API
   useEffect(() => {
-    const loadGuards = async () => {
-      try {
-        const res = await fetchWithAuth(`${API_BASE_URL}/api/guards`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setAllGuards(data);
-          }
-        }
-      } catch (e) {
-        console.log('Could not load guards from backend', e);
-      }
-    };
     loadGuards();
   }, []);
 
   // Fetch site from API on mount
   useEffect(() => {
     const loadSite = async () => {
+      setIsLoadingSite(true);
       try {
         const res = await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(siteId)}`);
         if (res.ok) {
-          const data = await res.json();
-          setSite(data);
-          setName(data.name);
-          setIsActive(!!data.isActive);
-          setAssignedGuardIds(Array.isArray(data.assignedGuards) ? data.assignedGuards.slice() : []);
-          setGeofenceMode(data.geofenceType || 'radius');
-          setRadiusValue(data.geofenceRadius || 100);
-          setPolygonText(data.geofencePolygon ? JSON.stringify(data.geofencePolygon, null, 2) : '');
-          setPolygonPoints(Array.isArray(data.geofencePolygon) ? data.geofencePolygon.map((p:any)=>({lat:Number(p.lat), lng:Number(p.lng)})) : []);
-          setPatrolCheckpoints(data.patrolRoute || []);
+          const data = parseApiData(await res.json());
+          if (data && typeof data === 'object') applySite(data);
         }
       } catch (e) {
         console.log('Could not load site from backend');
+      } finally {
+        setIsLoadingSite(false);
       }
     };
     loadSite();
   }, [siteId]);
+
+  if (!site && isLoadingSite) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 text-sm text-muted-foreground">Loading site…</div>
+      </DashboardLayout>
+    );
+  }
 
   if (!site) {
     return (
@@ -119,6 +149,9 @@ export default function ManageSitePage() {
       </DashboardLayout>
     );
   }
+
+  const hasLocation = Number.isFinite(Number(site.location?.lat)) && Number.isFinite(Number(site.location?.lng));
+  const center: [number, number] = hasLocation ? [Number(site.location.lat), Number(site.location.lng)] : FALLBACK_CENTER;
 
   // Use allGuards from API instead of mockGuards
   const assignedGuards = allGuards.filter(g => assignedGuardIds.includes(g.id));
@@ -162,130 +195,123 @@ export default function ManageSitePage() {
     return validStatuses.includes(status) ? status as any : 'secondary';
   }
 
+  // Saves only what was changed on the page: the site's own fields with PUT /api/sites/:id,
+  // and each added or removed guard with PUT /api/guards/:id {siteId}.
   async function saveChanges() {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      toast({ title: 'Not saved', description: "Site name can't be empty.", variant: 'destructive' });
+      return;
+    }
+
+    const changes: Record<string, unknown> = {};
+    if (trimmedName !== site.name) changes.name = trimmedName;
+    if (isActive !== !!site.isActive) changes.isActive = isActive;
+
+    const savedMode = site.geofenceType === 'polygon' ? 'polygon' : 'radius';
+    if (geofenceMode === 'radius') {
+      if (savedMode !== 'radius') changes.geofenceType = 'radius';
+      if (savedMode !== 'radius' || Number(radiusValue) !== (site.geofenceRadius || 100)) {
+        changes.geofenceRadius = Number(radiusValue);
+      }
+    } else {
+      // prefer drawn polygon points, fallback to parsed JSON
+      let polygon = polygonPoints;
+      if (polygon.length === 0) {
+        try {
+          polygon = toPolygon(JSON.parse(polygonText));
+        } catch (err) {
+          polygon = [];
+        }
+      }
+      if (polygon.length < 3 || polygon.some(p => !Number.isFinite(p.lat) || !Number.isFinite(p.lng))) {
+        toast({ title: 'Not saved', description: 'A polygon geofence needs at least 3 points on the map.', variant: 'destructive' });
+        return;
+      }
+      if (savedMode !== 'polygon') changes.geofenceType = 'polygon';
+      if (JSON.stringify(polygon) !== JSON.stringify(toPolygon(site.geofencePolygon))) changes.geofencePolygon = polygon;
+    }
+
+    const savedRoute = Array.isArray(site.patrolRoute) ? site.patrolRoute : [];
+    if (JSON.stringify(patrolCheckpoints) !== JSON.stringify(savedRoute)) changes.patrolRoute = patrolCheckpoints;
+
+    const savedGuardIds: string[] = Array.isArray(site.assignedGuards) ? site.assignedGuards : [];
+    const addedGuardIds = assignedGuardIds.filter(gid => !savedGuardIds.includes(gid));
+    const removedGuardIds = savedGuardIds.filter(gid => !assignedGuardIds.includes(gid));
+    if (addedGuardIds.length > 0 || removedGuardIds.length > 0) changes.assignedGuards = assignedGuardIds;
+
+    if (Object.keys(changes).length === 0) {
+      toast({ title: 'Nothing to save', description: 'No changes were made.' });
+      return;
+    }
+
+    setIsSaving(true);
     try {
-      // prepare geofence payload
-      const updatedGeofence: any = {};
-      updatedGeofence.geofenceType = geofenceMode;
-      if (geofenceMode === 'radius') {
-        updatedGeofence.geofenceRadius = Number(radiusValue) || 0;
-        updatedGeofence.geofencePolygon = undefined;
-      } else {
-        // prefer drawn polygon points, fallback to parsed JSON
-        if (polygonPoints && polygonPoints.length > 0) {
-          updatedGeofence.geofencePolygon = polygonPoints.map(p => ({ lat: Number(p.lat), lng: Number(p.lng) }));
-        } else {
-          try {
-            const parsed = JSON.parse(polygonText);
-            if (Array.isArray(parsed)) {
-              updatedGeofence.geofencePolygon = parsed.map((p: any) => ({ lat: Number(p.lat), lng: Number(p.lng) }));
-            }
-          } catch (err) {
-            // ignore
-          }
-        }
-        updatedGeofence.geofenceRadius = undefined;
+      const sitePath = `${API_BASE_URL}/api/sites/${encodeURIComponent(String(site.id))}`;
+      await fetchJson(sitePath, 'PUT', changes);
+      for (const guardId of addedGuardIds) {
+        await fetchJson(`${API_BASE_URL}/api/guards/${encodeURIComponent(guardId)}`, 'PUT', { siteId: site.id });
       }
-
-      const updatedSite = {
-        ...site,
-        name,
-        isActive,
-        assignedGuards: assignedGuardIds,
-        patrolRoute: patrolCheckpoints,
-        ...updatedGeofence,
-      };
-
-      // Save to API
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(site.id))}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedSite),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      // Fetch the updated site from server
-      const getRes = await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(site.id))}`);
-      const savedSite = getRes.ok ? await getRes.json() : updatedSite;
-
-      // update allGuards state with new assignments
-      setAllGuards(prev => prev.map(g => {
-        if (assignedGuardIds.includes(g.id)) {
-          return { ...g, siteId: site.id };
-        } else if (g.siteId === site.id && !assignedGuardIds.includes(g.id)) {
-          return { ...g, siteId: null };
-        }
-        return g;
-      }));
-
-      // Update guards on server
-      for (const guardId of assignedGuardIds) {
+      for (const guardId of removedGuardIds) {
+        // A guard listed here but already moved to another site keeps that other site
         const guard = allGuards.find(g => g.id === guardId);
-        if (guard) {
-          await fetchWithAuth(`${API_BASE_URL}/api/guards/${guardId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...guard, siteId: site.id }),
-          });
-        }
+        if (guard && guard.siteId && guard.siteId !== site.id) continue;
+        await fetchJson(`${API_BASE_URL}/api/guards/${encodeURIComponent(guardId)}`, 'PUT', { siteId: null });
       }
 
-      // refresh local `site` state so UI reflects saved values while staying on page
-      setSite(savedSite);
-
-      alert('Site saved to database');
+      // Show what the server now holds
+      applySite(await fetchJson(sitePath));
+      await loadGuards();
+      toast({ title: 'Site saved', description: 'Your changes were saved.' });
     } catch (err) {
       console.error('Failed to save site:', err);
-      alert('Failed to save site');
+      toast({ title: 'Not saved', description: err instanceof Error ? err.message : 'Failed to save site.', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
     }
   }
 
-  async function removeGuard(guardId: string) {
-    // Remove from local state
+  // Removing is applied with Save, like adding
+  function removeGuard(guardId: string) {
     setAssignedGuardIds(prev => prev.filter(id => id !== guardId));
-    
-    // Also update the guard on the server to remove site assignment
-    const guard = allGuards.find(g => g.id === guardId);
-    if (guard) {
-      try {
-        await fetchWithAuth(`${API_BASE_URL}/api/guards/${guardId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...guard, siteId: null }),
-        });
-        // Update local state to reflect the change
-        setAllGuards(prev => prev.map(g => 
-          g.id === guardId ? { ...g, siteId: null } : g
-        ));
-      } catch (err) {
-        console.error('Failed to unassign guard from site:', err);
-      }
+  }
+
+  // Active/Inactive is saved straight away; only that field is sent
+  async function setActiveOnServer(value: boolean) {
+    if (value === !!site.isActive) {
+      setIsActive(value);
+      return;
+    }
+    setIsActive(value);
+    try {
+      await fetchJson(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(site.id))}`, 'PUT', { isActive: value });
+      setSite({ ...site, isActive: value });
+      toast({ title: value ? 'Site activated' : 'Site deactivated' });
+    } catch (e) {
+      setIsActive(!!site.isActive);
+      toast({ title: 'Not saved', description: e instanceof Error ? e.message : 'Could not change the site status.', variant: 'destructive' });
     }
   }
 
   async function deleteSite() {
     if (!site || deleteConfirmText !== site.name) {
-      alert('Please type the exact site name to confirm deletion.');
+      toast({ title: 'Not deleted', description: 'Please type the exact site name to confirm deletion.', variant: 'destructive' });
       return;
     }
     try {
-      // Delete from API
+      // Delete from API (the server unassigns the site's guards)
       const res = await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(site.id))}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      // unassign guards in local state
-      setAllGuards(prev => prev.map(g => {
-        if (g.siteId === site.id) return { ...g, siteId: null };
-        return g;
-      }));
-      alert('Site deleted');
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(getApiErrorMessage(data, 'Failed to delete site'));
+      }
+      toast({ title: 'Site deleted', description: `${site.name} was deleted.` });
       navigate('/sites');
     } catch (err) {
       console.error('Failed to delete site:', err);
-      alert('Failed to delete site');
+      toast({ title: 'Not deleted', description: err instanceof Error ? err.message : 'Failed to delete site.', variant: 'destructive' });
     } finally {
       setShowDeleteDialog(false);
       setDeleteConfirmText('');
@@ -320,17 +346,7 @@ export default function ManageSitePage() {
                       <Button 
                         variant={isActive ? 'glow' : 'outline'} 
                         size="sm" 
-                        onClick={async () => {
-                          setIsActive(true);
-                          // Update immediately on server
-                          try {
-                            await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(site.id))}`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ ...site, isActive: true }),
-                            });
-                          } catch (e) { console.error(e); }
-                        }} 
+                        onClick={() => setActiveOnServer(true)} 
                         className="mr-2"
                       >
                         Active
@@ -338,17 +354,7 @@ export default function ManageSitePage() {
                       <Button 
                         variant={!isActive ? 'outline' : 'ghost'} 
                         size="sm" 
-                        onClick={async () => {
-                          setIsActive(false);
-                          // Update immediately on server
-                          try {
-                            await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(site.id))}`, {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ ...site, isActive: false }),
-                            });
-                          } catch (e) { console.error(e); }
-                        }}
+                        onClick={() => setActiveOnServer(false)}
                       >
                         Inactive
                       </Button>
@@ -433,7 +439,8 @@ export default function ManageSitePage() {
                       ))}
                     </div>
 
-                    <Button 
+                    <p className="mt-2 text-xs text-muted-foreground">Guards you add or remove are saved when you press Save.</p>
+                    <Button
                       onClick={() => {
                         setSelectedGuardsToAdd([]);
                         setGuardSearchQuery('');
@@ -500,13 +507,13 @@ export default function ManageSitePage() {
                       )}
                       
                       <MapContainer
-                        center={[site.location.lat || 12.97, site.location.lng || 77.59]}
+                        center={center}
                         zoom={16}
                         className="w-full h-full"
                       >
                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                         {/* Site center marker */}
-                        <Marker position={[site.location.lat, site.location.lng]} />
+                        {hasLocation && <Marker position={center} />}
                         {/* Patrol checkpoints */}
                         {patrolCheckpoints.map((cp, i) => (
                           <Circle
@@ -644,14 +651,14 @@ export default function ManageSitePage() {
                       {/* Live preview map */}
                       <div className="w-full h-64 rounded-md overflow-hidden border mt-4">
                         <MapContainer
-                          center={[site.location.lat || 12.97, site.location.lng || 77.59]}
+                          center={center}
                           zoom={15}
                           className="w-full h-full"
                         >
                           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                          <Marker position={[site.location.lat, site.location.lng]} />
+                          {hasLocation && <Marker position={center} />}
                           <Circle
-                            center={[site.location.lat, site.location.lng]}
+                            center={center}
                             radius={radiusValue}
                             pathOptions={{ color: '#4D6A57', fillColor: '#4D6A57', fillOpacity: 0.2 }}
                           />
@@ -664,7 +671,7 @@ export default function ManageSitePage() {
                     <div>
                       <div className="text-sm text-muted-foreground mb-2">Draw polygon on map (click to add points)</div>
                       <div className="w-full h-72 rounded-md overflow-hidden border">
-                        <MapContainer center={[site.location.lat || 12.97, site.location.lng || 77.59]} zoom={13} className={`w-full h-full ${geofenceMode === 'polygon' ? 'cursor-pin' : ''}`}>
+                        <MapContainer center={center} zoom={13} className={`w-full h-full ${geofenceMode === 'polygon' ? 'cursor-pin' : ''}`}>
                           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                           <Polygon positions={polygonPoints.map(p => [p.lat, p.lng]) as any} pathOptions={{ color: 'blue', fillOpacity: 0.1 }} />
                             {polygonPoints.map((p, i) => (
@@ -691,7 +698,7 @@ export default function ManageSitePage() {
                   
                   {/* Save actions under the map */}
                   <div className="mt-4">
-                    <Button onClick={saveChanges} className="w-full h-10">Save</Button>
+                    <Button onClick={saveChanges} disabled={isSaving} className="w-full h-10">{isSaving ? 'Saving...' : 'Save'}</Button>
                     <Button variant="outline" onClick={() => navigate('/sites')} className="w-full mt-2">Cancel</Button>
                   </div>
 
@@ -701,7 +708,8 @@ export default function ManageSitePage() {
           </div>
         </div>
 
-        {/* Danger zone: moved lower so user must scroll to reach it */}
+        {/* Danger zone: moved lower so user must scroll to reach it (admins only) */}
+        {isAdmin && (
         <div className="mt-8">
           <Card className="border-destructive/30 bg-destructive/5">
             <CardHeader>
@@ -724,6 +732,7 @@ export default function ManageSitePage() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
 
       {/* Add Guard Dialog */}
