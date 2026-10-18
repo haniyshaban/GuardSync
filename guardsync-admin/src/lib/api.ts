@@ -1,6 +1,5 @@
 // API Configuration and base service for Admin App
 import { API_BASE_URL } from './utils';
-import { ApiResponse } from '@guardsync/shared/types/common';
 
 const API_ENDPOINT = `${API_BASE_URL}/api`;
 const TOKEN_STORAGE_KEY = 'guardsync_admin_auth_token';
@@ -74,9 +73,8 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: { code: 'REQUEST_FAILED', message: 'Request failed' } }));
-      const errorMessage = error.error?.message || error.error || error.message || `HTTP ${response.status}`;
-      throw new Error(errorMessage);
+      const error = await response.json().catch(() => null);
+      throw new Error(getApiErrorMessage(error, `Request failed (HTTP ${response.status})`));
     }
 
     const data = await response.json();
@@ -123,9 +121,8 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: { code: 'UPLOAD_FAILED', message: 'Upload failed' } }));
-      const errorMessage = error.error?.message || error.error || error.message || 'Upload failed';
-      throw new Error(errorMessage);
+      const error = await response.json().catch(() => null);
+      throw new Error(getApiErrorMessage(error, 'Upload failed'));
     }
 
     const data = await response.json();
@@ -176,4 +173,29 @@ export function parseApiData<T = any>(json: any): T {
   }
   // Otherwise return the json as-is
   return json as T;
+}
+
+/**
+ * Get a readable message out of a failed API reply. Replies look like
+ * {success: false, error: {code, message}}; some older ones are {error: 'text'}.
+ */
+export function getApiErrorMessage(json: unknown, fallback = 'Something went wrong. Please try again.'): string {
+  const error = (json as { error?: unknown } | null)?.error;
+  const message = typeof error === 'string' ? error : (error as { message?: unknown } | undefined)?.message;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+}
+
+/**
+ * fetchWithAuth for JSON calls. Sends `body` as JSON, throws an Error carrying the server's
+ * message when the reply is not ok, and returns the reply's data (unwrapped).
+ */
+export async function fetchJson<T = unknown>(url: string, method = 'GET', body?: unknown): Promise<T> {
+  const res = await fetchWithAuth(url, {
+    method,
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(getApiErrorMessage(json, `Request failed (HTTP ${res.status})`));
+  return parseApiData<T>(json);
 }
