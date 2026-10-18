@@ -108,8 +108,9 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose
       <div className="p-3 border-t border-sidebar-border space-y-2">
         {!collapsed && user && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
-            <div className="font-medium text-foreground truncate">{user.name}</div>
-            <div className="truncate">{user.email}</div>
+            <div className="font-medium text-foreground truncate">{user.name || 'Signed in'}</div>
+            {user.email && <div className="truncate">{user.email}</div>}
+            <div className="capitalize">{user.role}</div>
           </div>
         )}
         <Button
@@ -202,8 +203,9 @@ export function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose
           <div className="p-3 border-t border-sidebar-border space-y-2">
             {user && (
               <div className="px-3 py-2 text-xs text-muted-foreground">
-                <div className="font-medium text-foreground truncate">{user.name}</div>
-                <div className="truncate">{user.email}</div>
+                <div className="font-medium text-foreground truncate">{user.name || 'Signed in'}</div>
+                {user.email && <div className="truncate">{user.email}</div>}
+                <div className="capitalize">{user.role}</div>
               </div>
             )}
             <Button
