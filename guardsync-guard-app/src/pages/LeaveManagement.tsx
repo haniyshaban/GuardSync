@@ -37,6 +37,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { LeaveRequest } from '@/types/guard';
 import api from '@/services/api';
+import { errorMessage } from '@/lib/apiError';
 
 export default function LeaveManagement() {
   const navigate = useNavigate();
@@ -66,6 +67,12 @@ export default function LeaveManagement() {
         const response = await api.get<LeaveRequest[]>(`/leave-requests?guardId=${guard.id}`);
         if (response.success && response.data) {
           setLeaveRequests(response.data);
+        } else if (!response.success) {
+          toast({
+            title: 'Error',
+            description: errorMessage(response.error, 'Failed to load leave history'),
+            variant: 'destructive',
+          });
         }
       } catch (error) {
         console.error('Failed to fetch leave requests:', error);
@@ -179,12 +186,12 @@ export default function LeaveManagement() {
           description: 'Your leave request is pending approval',
         });
       } else {
-        throw new Error(response.error || 'Failed to submit');
+        throw new Error(errorMessage(response.error, 'Please try again later'));
       }
     } catch (error) {
       toast({
         title: 'Submission Failed',
-        description: 'Please try again later',
+        description: errorMessage(error, 'Please try again later'),
         variant: 'destructive',
       });
     } finally {
@@ -202,12 +209,12 @@ export default function LeaveManagement() {
           description: 'Your leave request has been cancelled',
         });
       } else {
-        throw new Error('Failed to cancel');
+        throw new Error(errorMessage(response.error, 'Please try again'));
       }
     } catch (error) {
       toast({
         title: 'Failed to Cancel',
-        description: 'Please try again',
+        description: errorMessage(error, 'Please try again'),
         variant: 'destructive',
       });
     }

@@ -153,19 +153,20 @@ export const submitLeaveRequest = async (
     leaveType: 'casual' | 'sick' | 'emergency' | 'annual';
   }
 ): Promise<ApiResponse<LeaveRequest>> => {
-  return api.post('/leave/request', { guardId, ...data });
+  return api.post('/leave-requests', { guardId, ...data });
 };
 
 export const getLeaveRequests = async (
   guardId: string
 ): Promise<ApiResponse<LeaveRequest[]>> => {
-  return api.get(`/leave/guard/${guardId}`);
+  return api.get(`/leave-requests?guardId=${encodeURIComponent(guardId)}`);
 };
 
+/** A guard can cancel their own request while it is still pending */
 export const cancelLeaveRequest = async (
   leaveId: string
-): Promise<ApiResponse<LeaveRequest>> => {
-  return api.delete(`/leave/${leaveId}`);
+): Promise<ApiResponse<{ ok: boolean }>> => {
+  return api.delete(`/leave-requests/${leaveId}`);
 };
 
 // ============ Patrol ============
