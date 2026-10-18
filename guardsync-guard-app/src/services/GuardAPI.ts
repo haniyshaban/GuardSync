@@ -248,13 +248,15 @@ export const getPayrollRecord = async (
   month: number,
   year: number
 ): Promise<ApiResponse<PayrollRecord>> => {
-  return api.get(`/payroll/${guardId}?month=${month}&year=${year}`);
+  // One month's payslip; the server works it out from attendance if it doesn't exist yet.
+  // (GET /payroll/:guardId without month and year is the list of all records.)
+  return api.get(`/payroll/${guardId}/${month}/${year}`);
 };
 
 export const getPayrollHistory = async (
   guardId: string
 ): Promise<ApiResponse<PayrollRecord[]>> => {
-  return api.get(`/payroll/${guardId}/history`);
+  return api.get(`/payroll/${guardId}`);
 };
 
 // ============ Conveyance Requests ============

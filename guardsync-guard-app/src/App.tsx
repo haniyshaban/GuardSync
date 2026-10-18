@@ -2,8 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { loadFaceApiModels } from "@/services/FaceApiService";
 import Login from "./pages/Login";
@@ -73,10 +75,28 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Shown when a screen crashes, instead of a blank app
+function ScreenError({ onRetry }: { onRetry: () => void }) {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+      <h1 className="text-xl font-semibold text-foreground mb-2">Something went wrong</h1>
+      <p className="text-sm text-muted-foreground mb-6">This screen could not be shown.</p>
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={onRetry}>Try again</Button>
+        <Button variant="gradient" onClick={() => navigate('/')}>Go to home</Button>
+      </div>
+    </div>
+  );
+}
+
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
 
   return (
+    // Moving to another screen clears the error
+    <ErrorBoundary resetKey={location.pathname} fallback={(retry) => <ScreenError onRetry={retry} />}>
     <Routes>
       <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/enroll" element={<EnrollmentForm />} />
@@ -90,6 +110,7 @@ function AppRoutes() {
       <Route path="/patrol" element={<ProtectedRoute><PatrolMode /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </ErrorBoundary>
   );
 }
 

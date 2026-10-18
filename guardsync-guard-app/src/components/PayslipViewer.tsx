@@ -23,13 +23,41 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Guard, PayrollRecord, AttendanceLog } from '@/types/guard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { Guard, PayrollRecord } from '@/types/guard';
 import { getPayrollRecord } from '@/services/GuardAPI';
 import { escapeHtml } from '@/lib/utils';
+import { errorMessage } from '@/lib/apiError';
 
 interface PayslipViewerProps {
   guard: Guard;
 }
+
+// The server's payroll record also carries the PF deduction
+type Payslip = PayrollRecord & { pfDeduction: number };
+
+const toNumber = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Accept only a single payroll record; anything else (an empty reply, a list) means "no payslip"
+const toPayslip = (data: unknown): Payslip | null => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const record = data as Partial<Payslip>;
+  return {
+    ...(record as Payslip),
+    totalDaysWorked: toNumber(record.totalDaysWorked),
+    dailyRate: toNumber(record.dailyRate),
+    grossPay: toNumber(record.grossPay),
+    uniformDeduction: toNumber(record.uniformDeduction),
+    pfDeduction: toNumber(record.pfDeduction),
+    otherDeductions: toNumber(record.otherDeductions),
+    netPay: toNumber(record.netPay),
+  };
+};
+
+const rupees = (amount: number) => amount.toLocaleString('en-IN');
 
 // Attendance summary type
 interface AttendanceSummary {
@@ -59,31 +87,42 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [payroll, setPayroll] = useState<PayrollRecord | null>(null);
+  const [payroll, setPayroll] = useState<Payslip | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const payslipRef = useRef<HTMLDivElement>(null);
 
   // Fetch payroll from API when month/year changes or dialog opens
   useEffect(() => {
     if (!isDialogOpen || !guard?.id) return;
-    
+    // A reply for a month that is no longer selected is ignored
+    let cancelled = false;
+
     const fetchPayroll = async () => {
+      // Never show the previous month's figures under the new month's name
+      setPayroll(null);
+      setLoadError(null);
       setIsLoading(true);
       try {
         const response = await getPayrollRecord(guard.id, selectedMonth, selectedYear);
-        if (response.success && response.data) {
-          setPayroll(response.data);
+        if (cancelled) return;
+        if (response.success) {
+          setPayroll(toPayslip(response.data));
         } else {
-          console.log('Payroll fetch failed');
+          setLoadError(errorMessage(response.error, 'Could not load the payslip.'));
         }
       } catch (err) {
         console.error('Failed to fetch payroll:', err);
+        if (!cancelled) setLoadError('Could not load the payslip.');
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
-    
+
     fetchPayroll();
+    return () => {
+      cancelled = true;
+    };
   }, [guard?.id, selectedMonth, selectedYear, isDialogOpen]);
 
   // Calculate attendance from payroll data
@@ -238,25 +277,30 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
               <div class="section-title">Earnings</div>
               <div class="row">
                 <span class="label">Basic Pay (${payroll.totalDaysWorked} days × ₹${payroll.dailyRate})</span>
-                <span class="value">₹${payroll.grossPay.toLocaleString('en-IN')}</span>
+                <span class="value">₹${rupees(payroll.grossPay)}</span>
               </div>
             </div>
-            
+
             <div class="section">
               <div class="section-title">Deductions</div>
               <div class="row">
                 <span class="label">Uniform EMI</span>
-                <span class="value">₹${(payroll.uniformDeduction || 0).toLocaleString('en-IN')}</span>
+                <span class="value">₹${rupees(payroll.uniformDeduction)}</span>
               </div>
               <div class="row">
                 <span class="label">PF Contribution (12%)</span>
-                <span class="value">₹${(payroll.pfDeduction || payroll.otherDeductions || 0).toLocaleString('en-IN')}</span>
+                <span class="value">₹${rupees(payroll.pfDeduction)}</span>
               </div>
+              ${payroll.otherDeductions > 0 ? `
+              <div class="row">
+                <span class="label">Other Deductions</span>
+                <span class="value">₹${rupees(payroll.otherDeductions)}</span>
+              </div>` : ''}
             </div>
-            
+
             <div class="row total-row">
               <span>Net Payable</span>
-              <span>₹${payroll.netPay.toLocaleString('en-IN')}</span>
+              <span>₹${rupees(payroll.netPay)}</span>
             </div>
             
             <div class="footer">
@@ -317,11 +361,16 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
           </Button>
         </div>
 
-        {/* Payslip Content */}
+        {/* Payslip Content. If it fails to render, only this part shows an error. */}
+        <ErrorBoundary resetKey={`${selectedMonth}-${selectedYear}`}>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
             <span className="ml-2 text-muted-foreground">Loading payslip...</span>
+          </div>
+        ) : loadError ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>{loadError}</p>
           </div>
         ) : !payroll ? (
           <div className="text-center py-8 text-muted-foreground">
@@ -400,13 +449,13 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
                   Basic Pay ({payroll.totalDaysWorked} days × ₹{payroll.dailyRate})
                 </span>
                 <span className="font-medium text-primary">
-                  ₹{payroll.grossPay.toLocaleString('en-IN')}
+                  ₹{rupees(payroll.grossPay)}
                 </span>
               </div>
               <Separator />
               <div className="flex justify-between text-sm font-semibold">
                 <span>Gross Earnings</span>
-                <span className="text-primary">₹{payroll.grossPay.toLocaleString('en-IN')}</span>
+                <span className="text-primary">₹{rupees(payroll.grossPay)}</span>
               </div>
             </CardContent>
           </Card>
@@ -420,25 +469,33 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 py-2">
-              {(payroll.uniformDeduction || 0) > 0 && (
+              {payroll.uniformDeduction > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Uniform EMI</span>
                   <span className="text-destructive">
-                    -₹{(payroll.uniformDeduction || 0).toLocaleString('en-IN')}
+                    -₹{rupees(payroll.uniformDeduction)}
                   </span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">PF Contribution (12%)</span>
                 <span className="text-destructive">
-                  -₹{(payroll.pfDeduction || payroll.otherDeductions || 0).toLocaleString('en-IN')}
+                  -₹{rupees(payroll.pfDeduction)}
                 </span>
               </div>
+              {payroll.otherDeductions > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Other Deductions</span>
+                  <span className="text-destructive">
+                    -₹{rupees(payroll.otherDeductions)}
+                  </span>
+                </div>
+              )}
               <Separator />
               <div className="flex justify-between text-sm font-semibold">
                 <span>Total Deductions</span>
                 <span className="text-destructive">
-                  -₹{((payroll.uniformDeduction || 0) + (payroll.pfDeduction || payroll.otherDeductions || 0)).toLocaleString('en-IN')}
+                  -₹{rupees(payroll.uniformDeduction + payroll.pfDeduction + payroll.otherDeductions)}
                 </span>
               </div>
             </CardContent>
@@ -451,7 +508,7 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
                 <div>
                   <p className="text-sm text-muted-foreground">Net Payable</p>
                   <p className="text-2xl font-bold text-primary">
-                    ₹{payroll.netPay.toLocaleString('en-IN')}
+                    ₹{rupees(payroll.netPay)}
                   </p>
                 </div>
                 <Badge variant="outline" className="text-primary border-primary">
@@ -469,6 +526,7 @@ export function PayslipViewer({ guard }: PayslipViewerProps) {
           )}
         </div>
         )}
+        </ErrorBoundary>
 
         {/* Download Button */}
         <Button variant="gradient" className="w-full mt-4" onClick={handleDownloadPDF} disabled={!payroll || isLoading}>
