@@ -280,7 +280,7 @@ export interface ConveyanceRequest {
 
 export interface ConveyanceRequestPayload {
   guardId: string;
-  siteId: string;
+  siteId?: string;
   reason: string;
   estimatedDuration?: number;
   currentLocation?: {
@@ -400,8 +400,9 @@ export interface SOSAlert {
 export const sendSOSAlert = async (data: {
   guardId: string;
   guardName: string;
-  siteId?: string | null;
-  siteName?: string | null;
+  // Left out when the guard has no site
+  siteId?: string;
+  siteName?: string;
   lat?: number;
   lng?: number;
   message: string;

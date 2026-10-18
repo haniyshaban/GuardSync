@@ -36,6 +36,7 @@ import {
   verifyFace
 } from '@/services/GuardAPI';
 import { descriptorToString } from '@/services/FaceApiService';
+import { errorMessage } from '@/lib/apiError';
 
 // Location sync interval (30 seconds)
 const LOCATION_SYNC_INTERVAL = 30 * 1000;
@@ -47,7 +48,7 @@ const MAX_WAKE_INTERVAL = 90 * 60 * 1000; // 90 minutes maximum
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { guard, updateGuard } = useAuth();
+  const { guard, site, updateGuard } = useAuth();
   const { toast } = useToast();
   // On duty is driven by the guard's clock-in status, so it survives navigation and reloads
   const [isCheckedIn, setIsCheckedIn] = useState(guard?.status === 'active');
@@ -320,9 +321,10 @@ export default function Dashboard() {
     setIsSubmittingConveyance(true);
     
     try {
+      const siteId = guard.siteId || guard.currentShift?.siteId || site?.id;
       const response = await submitConveyanceRequest({
         guardId: guard.id,
-        siteId: guard.siteId || '',
+        ...(siteId ? { siteId } : {}),
         reason: conveyanceReason.trim(),
         estimatedDuration: 30,
       });
@@ -338,7 +340,7 @@ export default function Dashboard() {
       } else {
         toast({
           title: 'Request Failed',
-          description: response.error || 'Could not submit request',
+          description: errorMessage(response.error, 'Could not submit request'),
           variant: 'destructive',
         });
       }
@@ -400,17 +402,20 @@ export default function Dashboard() {
         }
       }
 
+      // Leave out what isn't known (no site yet, no location) rather than send null
+      const siteId = guard.siteId || guard.currentShift?.siteId || site?.id;
+      const siteName = site?.name || guard.currentShift?.location;
       const response = await sendSOSAlert({
         guardId: guard.id,
         guardName: guard.name,
-        siteId: guard.siteId || null,
-        siteName: guard.currentShift?.location || null,
+        ...(siteId ? { siteId } : {}),
+        ...(siteId && siteName ? { siteName } : {}),
         lat,
         lng,
         message: sosMessage.trim() || 'Emergency SOS Alert',
       });
 
-      if (!response.success) throw new Error(response.error || 'Failed to send SOS');
+      if (!response.success) throw new Error(errorMessage(response.error, 'Could not send the alert.'));
 
       setSosActive(true);
       setShowSOSDialog(false);
@@ -424,7 +429,7 @@ export default function Dashboard() {
       console.error('SOS submit error:', error);
       toast({
         title: 'SOS Failed',
-        description: 'Could not send alert. Try calling emergency services.',
+        description: `${errorMessage(error, 'Could not send the alert.')} Try calling emergency services.`,
         variant: 'destructive',
       });
     } finally {
