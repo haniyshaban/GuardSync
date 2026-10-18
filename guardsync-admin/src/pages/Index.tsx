@@ -8,7 +8,7 @@ import { fetchWithAuth, parseApiData } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Guard, Site, AttendanceLog } from '@/types';
-import L from 'leaflet';
+import { isNotOnSite } from '@/lib/geofence';
 import { 
   Users, 
   UserCheck, 
@@ -20,11 +20,12 @@ import {
   Download,
   Clock
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 
 const Index = () => {
+  const navigate = useNavigate();
   const [guards, setGuards] = useState<Guard[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
@@ -35,86 +36,98 @@ const Index = () => {
     totalGuards: 0
   });
 
+  // Loaders are shared by the polling effects below and the Refresh button
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/stats/dashboard`);
+      if (res.ok) {
+        const json = await res.json();
+        const data = parseApiData(json);
+        setDashboardStats(data);
+      }
+    } catch (e) {
+      console.log('Could not fetch dashboard stats', e);
+    }
+  }, []);
+
+  const loadGuards = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/guards`);
+      if (res.ok) {
+        const json = await res.json();
+        const data = parseApiData(json);
+        if (Array.isArray(data)) {
+          setGuards(data);
+        }
+      }
+    } catch (e) {
+      console.log('Could not load guards from backend', e);
+    }
+  }, []);
+
+  const loadSites = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/sites`);
+      if (res.ok) {
+        const json = await res.json();
+        const data = parseApiData(json);
+        if (Array.isArray(data)) {
+          setSites(data);
+        }
+      }
+    } catch (e) {
+      console.log('Could not load sites from backend', e);
+    }
+  }, []);
+
+  const loadAttendance = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/attendance?date=${today}`);
+      if (res.ok) {
+        const json = await res.json();
+        const data = parseApiData(json);
+        if (Array.isArray(data)) {
+          setAttendanceLogs(data);
+        }
+      }
+    } catch (e) {
+      console.log('Could not load attendance from backend', e);
+    }
+  }, []);
+
   // Fetch dashboard stats from API
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await fetchWithAuth(`${API_BASE_URL}/api/stats/dashboard`);
-        if (res.ok) {
-          const json = await res.json();
-          const data = parseApiData(json);
-          setDashboardStats(data);
-        }
-      } catch (e) {
-        console.log('Could not fetch dashboard stats', e);
-      }
-    };
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000); // Refresh every 30 seconds
+    loadStats();
+    const interval = setInterval(loadStats, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [loadStats]);
 
   // Fetch guards from API
   useEffect(() => {
-    const loadGuards = async () => {
-      try {
-        const res = await fetchWithAuth(`${API_BASE_URL}/api/guards`);
-        if (res.ok) {
-          const json = await res.json();
-          const data = parseApiData(json);
-          if (Array.isArray(data)) {
-            setGuards(data);
-          }
-        }
-      } catch (e) {
-        console.log('Could not load guards from backend', e);
-      }
-    };
     loadGuards();
     const interval = setInterval(loadGuards, 15000); // Refresh every 15 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [loadGuards]);
 
   // Fetch sites from API
   useEffect(() => {
-    const loadSites = async () => {
-      try {
-        const res = await fetchWithAuth(`${API_BASE_URL}/api/sites`);
-        if (res.ok) {
-          const json = await res.json();
-          const data = parseApiData(json);
-          if (Array.isArray(data)) {
-            setSites(data);
-          }
-        }
-      } catch (e) {
-        console.log('Could not load sites from backend', e);
-      }
-    };
     loadSites();
-  }, []);
+  }, [loadSites]);
 
   // Fetch attendance logs from API
   useEffect(() => {
-    const loadAttendance = async () => {
-      try {
-        const today = new Date().toISOString().slice(0, 10);
-        const res = await fetchWithAuth(`${API_BASE_URL}/api/attendance?date=${today}`);
-        if (res.ok) {
-          const json = await res.json();
-          const data = parseApiData(json);
-          if (Array.isArray(data)) {
-            setAttendanceLogs(data);
-          }
-        }
-      } catch (e) {
-        console.log('Could not load attendance from backend', e);
-      }
-    };
     loadAttendance();
     const interval = setInterval(loadAttendance, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadAttendance]);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshAll = async () => {
+    setIsRefreshing(true);
+    await Promise.all([loadStats(), loadGuards(), loadSites(), loadAttendance()]);
+    setIsRefreshing(false);
+  };
   const [now, setNow] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -164,37 +177,8 @@ const Index = () => {
 
   const attritionPercent = expectedAssigned > 0 ? Math.round(((expectedAssigned - workingToday) / expectedAssigned) * 100) : 0;
 
-  // Helper: point-in-polygon + radius check (copied from LiveMap) to compute not-on-site
-  const pointInPolygon = (point: [number, number], vs: Array<[number, number]>): boolean => {
-    const x = point[0], y = point[1];
-    let inside = false;
-    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-      const xi = vs[i][0], yi = vs[i][1];
-      const xj = vs[j][0], yj = vs[j][1];
-      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi + Number.EPSILON) + xi);
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  };
-
-  const isPointInsideSiteGeofence = (lat: number, lng: number, site: typeof sites[number]) => {
-    if ((site as any).geofenceType === 'polygon' && Array.isArray((site as any).geofencePolygon) && (site as any).geofencePolygon.length > 0) {
-      const vs = (site as any).geofencePolygon.map((p: any) => [p.lat, p.lng] as [number, number]);
-      return pointInPolygon([lat, lng], vs);
-    }
-    const dist = L.latLng(lat, lng).distanceTo(L.latLng(site.location.lat, site.location.lng));
-    return dist <= (site.geofenceRadius || 0);
-  };
-
-  const notOnSiteCount = guards.filter(g => {
-    if (!g.siteId) return false;
-    const site = sites.find(s => s.id === g.siteId);
-    if (!site || !site.isActive) return false;
-    if (!g.location) return true;
-    try {
-      return !isPointInsideSiteGeofence(g.location.lat, g.location.lng, site);
-    } catch (e) { return true; }
-  }).length;
+  // Same check as the guards list's 'not on site' filter, which this card links to
+  const notOnSiteCount = guards.filter(g => isNotOnSite(g, sites)).length;
 
   // recent alerts should include status alerts plus missed check-ins (non-destructive)
   const alertSet = new Map<string, { guard: typeof guards[number]; reason: string }>();
@@ -220,11 +204,12 @@ const Index = () => {
               <span className="font-mono">{format(now, 'HH:mm:ss')}</span>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                <RefreshCw className="w-4 h-4 mr-2" />
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={refreshAll} disabled={isRefreshing}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Button variant="glow" size="sm" className="w-full sm:w-auto">
+              {/* Reports are filtered and exported (CSV or print) on the Reports page */}
+              <Button variant="glow" size="sm" className="w-full sm:w-auto" onClick={() => navigate('/reports')}>
                 <Download className="w-4 h-4 mr-2" />
                 Export Report
               </Button>
@@ -365,7 +350,8 @@ const Index = () => {
                         <p className="font-medium text-sm">{guard.name}</p>
                         <p className="text-xs text-muted-foreground">{guard.employeeId}</p>
                       </div>
-                            <Badge variant="alert">{(!attendanceLogs.find(l => l.guardId === guard.id) || !guard.clockInTime) ? 'Missed Check-in' : 'Alert'}</Badge>
+                      {/* Status 'alert' means the guard raised an SOS; the others missed their check-in */}
+                      <Badge variant="alert">{guard.status === 'alert' || guard.status === 'panic' ? 'SOS' : 'Missed Check-in'}</Badge>
                     </div>
                   </Link>
                 ))}
