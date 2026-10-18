@@ -110,6 +110,14 @@ vi.mock('../repositories/index.js', async () => {
           .run(clockedIn ? 1 : 0, clockInTime, status, guardId);
       },
     },
+    notificationRepo: {
+      createNotification: (guardId, type, title, message) => {
+        const db = getDb();
+        if (!db) return;
+        db.prepare('INSERT INTO guard_notifications (id, guardId, type, title, message, isRead, createdAt) VALUES (?, ?, ?, ?, ?, 0, ?)')
+          .run(crypto.randomUUID(), guardId, type, title, message, new Date().toISOString());
+      },
+    },
   };
 });
 
@@ -224,6 +232,45 @@ describe('Attendance API Tests', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
+    });
+
+    it('refuses a second clock-in while the guard is on duty (409)', async () => {
+      const clockInData = { guardId: testData.guardId, siteId: testData.siteId, withinGeofence: true };
+      const first = await request(app)
+        .post('/api/attendance/clock-in')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(clockInData)
+        .expect(201);
+
+      const response = await request(app)
+        .post('/api/attendance/clock-in')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(clockInData)
+        .expect(409);
+
+      expect(response.body.error.code).toBe('ALREADY_CLOCKED_IN');
+      // The original start of the shift is kept
+      expect(testDb.prepare('SELECT COUNT(*) AS c FROM attendance').get().c).toBe(1);
+      expect(testDb.prepare('SELECT clockInTime FROM guards WHERE id = ?').get(testData.guardId).clockInTime).toBe(first.body.data.clockIn);
+    });
+
+    it('creates the guard\'s check-in confirmation itself', async () => {
+      await request(app)
+        .post('/api/attendance/clock-in')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ guardId: testData.guardId, siteId: testData.siteId, withinGeofence: true })
+        .expect(201);
+
+      const notifications = testDb.prepare('SELECT * FROM guard_notifications WHERE guardId = ?').all(testData.guardId);
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0]).toMatchObject({ type: 'success', title: 'Check-in confirmed', message: 'Successfully checked in at Test Site.' });
+    });
+
+    it('can clock in again after clocking out', async () => {
+      const clockInData = { guardId: testData.guardId, siteId: testData.siteId, withinGeofence: true };
+      await request(app).post('/api/attendance/clock-in').set('Authorization', `Bearer ${authToken}`).send(clockInData).expect(201);
+      await request(app).post('/api/attendance/clock-out').set('Authorization', `Bearer ${authToken}`).send({}).expect(200);
+      await request(app).post('/api/attendance/clock-in').set('Authorization', `Bearer ${authToken}`).send(clockInData).expect(201);
     });
 
     it('should update guard clockedIn status', async () => {

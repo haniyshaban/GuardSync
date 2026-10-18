@@ -3,9 +3,10 @@ import { authMiddleware } from '../auth.js';
 import { actAsSelf, scopeQueryToSelf } from '../middleware/access.js';
 import { validate, validateQuery } from '../validation/index.js';
 import { clockInSchema, clockOutSchema, attendanceQuerySchema } from '../validation/attendance.schemas.js';
-import { attendanceRepo, guardRepo, siteRepo } from '../repositories/index.js';
+import { attendanceRepo, guardRepo, siteRepo, notificationRepo } from '../repositories/index.js';
 import { facesMatch } from '../utils/face.js';
 import { success, created, error, badRequest, notFound, unauthorized, forbidden, conflict, serverError, noContent } from '../utils/responses.js';
+import logger from '../logger.js';
 
 const router = express.Router();
 
@@ -58,8 +59,14 @@ router.post('/clock-in', authMiddleware(true, ['guard', 'admin']), actAsSelf, va
 
     // The site must be a real one. The id is stored and shown back in admin reports,
     // so it cannot be free text.
-    if (!siteRepo.findById(site_id)) {
+    const site = siteRepo.findById(site_id);
+    if (!site) {
       return badRequest(res, 'Unknown site');
+    }
+
+    // Checking in again while on duty would replace the start of the shift
+    if (attendanceRepo.findActiveClockin(guard_id)) {
+      return error(res, 409, 'ALREADY_CLOCKED_IN', 'You are already checked in. Check out first.');
     }
 
     // A guard with an enrolled face must present a matching one. The comparison happens here,
@@ -79,6 +86,14 @@ router.post('/clock-in', authMiddleware(true, ['guard', 'admin']), actAsSelf, va
 
     // Update guard status using repository
     guardRepo.updateClockInStatus(guard_id, true, clockIn, 'online');
+
+    // The confirmation in the guard's Alerts (guards cannot create notifications themselves).
+    // The check-in is already saved, so a failure here is only logged.
+    try {
+      notificationRepo.createNotification(guard_id, 'success', 'Check-in confirmed', `Successfully checked in at ${site.name || 'your site'}.`);
+    } catch (err) {
+      logger.warn({ err, guardId: guard_id }, 'Could not create the check-in notification');
+    }
 
     return created(res, { guardId: guard_id, siteId: site_id, clockIn, withinGeofence: !!within_geofence, date }, 'Clocked in successfully');
   } catch (err) {
