@@ -185,4 +185,20 @@ describe('Sites keep what was not changed', () => {
       expect(response.body.data.patrolRoute).toHaveLength(1);
     });
   });
+
+  describe('DELETE /api/guards/:id', () => {
+    it('takes the guard off the site\'s list, also the older assignedGuards copy', async () => {
+      // A site that only has the older JSON list (no site_guards rows)
+      testDb.prepare('DELETE FROM site_guards').run();
+      testDb.prepare('UPDATE sites SET assignedGuards = ? WHERE id = ?')
+        .run(JSON.stringify([testData.guardId, 'test-guard-2']), testData.siteId);
+
+      await request(app)
+        .delete(`/api/guards/${testData.guardId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect((await getSite()).assignedGuards).toEqual(['test-guard-2']);
+    });
+  });
 });

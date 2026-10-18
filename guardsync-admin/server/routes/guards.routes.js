@@ -272,6 +272,18 @@ router.delete('/:id', authMiddleware(true, ['admin']), (req, res) => {
     
     // Delete from site_guards table (normalized relation)
     try { db.prepare('DELETE FROM site_guards WHERE guard_id = ?').run(req.params.id); } catch(e) { logger.debug({ table: 'site_guards', error: e.message }, 'Cascade delete'); }
+
+    // ...and from the sites' assignedGuards column (the older copy of that list, which is still
+    // shown for a site that has no site_guards rows)
+    try {
+      for (const site of db.prepare('SELECT id, assignedGuards FROM sites').all()) {
+        const guardIds = site.assignedGuards ? JSON.parse(site.assignedGuards) : [];
+        if (Array.isArray(guardIds) && guardIds.includes(req.params.id)) {
+          db.prepare('UPDATE sites SET assignedGuards = ? WHERE id = ?')
+            .run(JSON.stringify(guardIds.filter((gid) => gid !== req.params.id)), site.id);
+        }
+      }
+    } catch(e) { logger.debug({ table: 'sites', error: e.message }, 'Cascade delete'); }
     
     // Delete the guard
     db.prepare('DELETE FROM guards WHERE id = ?').run(req.params.id);
