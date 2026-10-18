@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { toast as sonnerToast } from '@/components/ui/sonner';
 import SendMessageDialog from '@/components/ui/SendMessageDialog';
+import { messageGuard, pingGuard } from '@/lib/guardMessages';
 import { useState } from 'react';
 
 interface GuardListProps {
@@ -95,7 +95,7 @@ export function GuardList({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); sonnerToast.success(`Nudge sent to ${guard.name}`); }}>
+                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); pingGuard(guard); }}>
                   Ping
                 </Button>
 
@@ -111,10 +111,7 @@ export function GuardList({
           </div>
         ))}
       </div>
-      <SendMessageDialog open={dialogOpen} onOpenChange={setDialogOpen} guard={dialogGuard} onSend={(g, msg) => {
-        sonnerToast(`Message sent to ${g?.name}: ${msg || '—'}`);
-        console.log('Send message to', g?.id, msg);
-      }} />
+      <SendMessageDialog open={dialogOpen} onOpenChange={setDialogOpen} guard={dialogGuard} onSend={(g, msg) => g ? messageGuard(g, msg) : undefined} />
     </ScrollArea>
   );
 }

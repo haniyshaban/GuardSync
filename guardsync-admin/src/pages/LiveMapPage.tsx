@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { API_BASE_URL } from '@/lib/utils';
 import { fetchWithAuth, parseApiData } from '@/lib/api';
 import { useState, useEffect, useRef } from 'react';
-import { toast as sonnerToast } from '@/components/ui/sonner';
 import SendMessageDialog from '@/components/ui/SendMessageDialog';
+import { messageGuard, pingGuard } from '@/lib/guardMessages';
 import { 
   Map, 
   Layers, 
@@ -363,7 +363,7 @@ export default function LiveMapPage() {
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Button size="sm" variant="ghost" onClick={() => sonnerToast.success(`Nudge sent to ${selectedGuard.name}`)}>Ping</Button>
+                      <Button size="sm" variant="ghost" onClick={() => pingGuard(selectedGuard)}>Ping</Button>
                       <Button size="sm" variant="ghost" onClick={() => setMessageDialogOpen(true)}>Message</Button>
                       <Button size="sm" variant="ghost" onClick={() => { setPlaybackGuardId(selectedGuard.id); setPlaybackTrigger(t => t + 1); }}>Playback</Button>
                     </div>
@@ -374,10 +374,7 @@ export default function LiveMapPage() {
                 </CardContent>
               </Card>
             )}
-            <SendMessageDialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen} guard={selectedGuard || undefined} onSend={(g, msg) => {
-              sonnerToast(`Message sent to ${g?.name}: ${msg || '—'}`);
-              console.log('Send message to', g?.id, msg);
-            }} />
+            <SendMessageDialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen} guard={selectedGuard || undefined} onSend={(g, msg) => g ? messageGuard(g, msg) : undefined} />
             
           </div>
         </div>

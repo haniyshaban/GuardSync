@@ -5,8 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import { Guard, Site } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { toast as sonnerToast } from '@/components/ui/sonner';
 import SendMessageDialog from '@/components/ui/SendMessageDialog';
+import { messageGuard, pingGuard } from '@/lib/guardMessages';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -592,7 +592,7 @@ export function LiveMap({
                     <p className="text-xs text-muted-foreground">Clocked in: {formatDistanceToNow(guard.clockInTime, { addSuffix: true })}</p>
                   )}
                   <div className="mt-3 flex items-center gap-2">
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); sonnerToast.success(`Nudge sent to ${guard.name}`); console.log('Ping', guard.id); }}>Ping</Button>
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); pingGuard(guard); }}>Ping</Button>
                     <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setDialogGuard(guard); setDialogOpen(true); }}>Message</Button>
                     <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setLocalPlaybackGuardId(guard.id); setLocalPlaybackTrigger(t => t + 1); }}>Playback</Button>
                   </div>
@@ -623,10 +623,7 @@ export function LiveMap({
         </MapContainer>
 
         {/* Send message dialog used by marker popups */}
-        <SendMessageDialog open={dialogOpen} onOpenChange={setDialogOpen} guard={dialogGuard} onSend={(g, msg) => {
-          sonnerToast(`Message sent to ${g?.name}: ${msg || '—'}`);
-          console.log('Send message to', g?.id, msg);
-        }} />
+        <SendMessageDialog open={dialogOpen} onOpenChange={setDialogOpen} guard={dialogGuard} onSend={(g, msg) => g ? messageGuard(g, msg) : undefined} />
 
       {/* Map legend */}
       <div className="absolute bottom-4 left-4 z-[1000] bg-card/95 backdrop-blur-sm rounded-lg border border-border p-3">
