@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Camera, MapPin, Clock, CheckCircle, ArrowLeft, Scan, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { Camera, MapPin, Clock, CheckCircle, ArrowLeft, Scan, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FacialScanner } from '@/components/FacialScanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { BottomNav } from '@/components/BottomNav';
 import { useToast } from '@/hooks/use-toast';
 import { calculateDistance } from '@/lib/utils';
-import { clockIn, createNotification, saveFaceDescriptor, verifyFace } from '@/services/GuardAPI';
+import { clockIn, saveFaceDescriptor, verifyFace } from '@/services/GuardAPI';
 import { descriptorToString } from '@/services/FaceApiService';
+import { errorMessage } from '@/lib/apiError';
 
 type CheckInStep = 'confirm' | 'scanning' | 'submitting' | 'success';
 
@@ -29,6 +30,18 @@ export default function CheckIn() {
   // First check-in enrols the guard's face; every later one is verified against it on the server
   const isFaceEnrolled = !!guard?.faceEnrolled;
 
+  // A guard can only check in at their assigned site
+  const siteId = guard?.siteId || guard?.currentShift?.siteId || site?.id;
+
+  // Already on duty: there is nothing to check in to (checking in again would replace the
+  // shift's start time). Only on arrival; right after a check-in the success screen is shown.
+  const alreadyOnDuty = guard?.status === 'active' && step === 'confirm';
+  useEffect(() => {
+    if (alreadyOnDuty) {
+      toast({ title: 'Already checked in', description: 'You are on duty. Check out from the dashboard at the end of your shift.' });
+    }
+  }, [alreadyOnDuty, toast]);
+
   const verifyOwnFace = async (descriptor: Float32Array) => {
     if (!guard?.id) return false;
     const result = await verifyFace(guard.id, descriptorToString(descriptor));
@@ -37,6 +50,16 @@ export default function CheckIn() {
 
   const handleScanComplete = async (success: boolean, descriptor?: Float32Array) => {
     if (success) {
+      // Checked before anything is saved, so a guard without a site does not enrol a face for nothing
+      if (!siteId) {
+        toast({
+          title: 'No site assigned yet',
+          description: 'Ask your supervisor to assign you to a site before checking in.',
+          variant: 'destructive',
+        });
+        setStep('confirm');
+        return;
+      }
       setStep('submitting');
       try {
         if (!isFaceEnrolled) {
@@ -48,7 +71,7 @@ export default function CheckIn() {
           // Already enrolled (for example from another phone): carry on, the server checks this scan at clock-in
           const alreadyEnrolled = !saved.success && saved.error?.code === 'CONFLICT';
           if (!saved.success && !alreadyEnrolled) {
-            throw new Error('Could not save your face enrolment');
+            throw new Error(errorMessage(saved.error, 'Could not save your face enrolment'));
           }
           updateGuard({ faceEnrolled: true });
         }
@@ -79,7 +102,7 @@ export default function CheckIn() {
 
         // Log attendance to API
         const response = await clockIn(guard?.id || '', {
-          siteId: guard?.currentShift?.siteId || site?.id,
+          siteId,
           shiftId: guard?.currentShift?.id,
           latitude: lat,
           longitude: lng,
@@ -88,19 +111,19 @@ export default function CheckIn() {
         });
 
         if (!response.success) {
-          throw new Error(response.error || 'Failed to log check-in');
+          // The server already has an open check-in for this guard: they are on duty
+          if (response.error?.code === 'ALREADY_CLOCKED_IN') {
+            updateGuard({ status: 'active' });
+            toast({ title: 'Already checked in', description: errorMessage(response.error, 'You are already on duty.') });
+            navigate('/dashboard', { replace: true });
+            return;
+          }
+          throw new Error(errorMessage(response.error, 'Could not log your attendance. Please try again.'));
         }
 
-        // Mark the guard as on duty so the dashboard reflects it straight away
+        // Mark the guard as on duty so the dashboard reflects it straight away.
+        // (The server adds the 'Check-in confirmed' notification itself.)
         updateGuard({ status: 'active' });
-
-        // Create notification for successful check-in
-        await createNotification({
-          guardId: guard?.id || '',
-          type: 'success',
-          title: 'Check-in Confirmed',
-          message: `Successfully checked in at ${guard?.currentShift?.location || site?.name || 'your site'}.`,
-        });
 
         setCheckInTime(new Date().toLocaleTimeString('en-US', {
           hour: '2-digit',
@@ -120,13 +143,17 @@ export default function CheckIn() {
         console.error('Check-in error:', err);
         toast({
           title: 'Check-in Failed',
-          description: 'Could not log your attendance. Please try again.',
+          description: errorMessage(err, 'Could not log your attendance. Please try again.'),
           variant: 'destructive',
         });
         setStep('confirm');
       }
     }
   };
+
+  if (alreadyOnDuty) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   if (step === 'scanning') {
     return (
@@ -249,6 +276,18 @@ export default function CheckIn() {
           <p className="text-4xl font-bold font-mono text-foreground">{currentTime}</p>
         </div>
 
+        {/* No site: nothing to check in to */}
+        {!siteId ? (
+          <div className="glass-card p-6 flex flex-col items-center gap-3 text-center mb-4">
+            <AlertCircle className="w-10 h-10 text-warning" />
+            <p className="font-semibold text-foreground">No site assigned yet</p>
+            <p className="text-sm text-muted-foreground">Ask your supervisor to assign you to a site, then check in here.</p>
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>
+              Back to Dashboard
+            </Button>
+          </div>
+        ) : (
+        <>
         {/* Facial Recognition Button */}
         <button
           onClick={() => setStep('scanning')}
@@ -269,6 +308,8 @@ export default function CheckIn() {
         <p className="text-center text-xs text-muted-foreground">
           Position your face clearly in the frame for quick verification
         </p>
+        </>
+        )}
       </div>
 
       <BottomNav />

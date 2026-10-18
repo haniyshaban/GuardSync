@@ -352,14 +352,8 @@ export const markAllNotificationsAsRead = async (guardId: string): Promise<ApiRe
   return api.put(`/notifications/${guardId}/read-all`, {});
 };
 
-export const createNotification = async (data: {
-  guardId: string;
-  type: 'warning' | 'info' | 'success';
-  title: string;
-  message: string;
-}): Promise<ApiResponse<Notification>> => {
-  return api.post('/notifications', data);
-};
+// Guards do not create notifications (only staff can). The server adds the guard's own ones,
+// such as 'Check-in confirmed' when they clock in.
 
 // ============ Schedules ============
 
@@ -456,7 +450,6 @@ export const GuardAPI = {
   getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-  createNotification,
   getSchedules,
   sendSOSAlert,
   updateGuardLocation,

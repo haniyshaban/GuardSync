@@ -58,13 +58,16 @@ export default function Dashboard() {
     setIsCheckedIn(guard?.status === 'active');
   }, [guard?.status]);
 
+  // A guard can only check in once they have been assigned to a site
+  const hasSite = !!(guard?.siteId || guard?.currentShift?.siteId || site?.id);
+
   const handleCheckOut = async () => {
     if (!guard?.id || isCheckingOut) return;
     setIsCheckingOut(true);
     try {
       const response = await clockOut(guard.id, { latitude: 0, longitude: 0, withinGeofence: true });
       if (!response.success) {
-        throw new Error(response.error || 'Failed to log check-out');
+        throw new Error(errorMessage(response.error, 'Could not log your check-out. Please try again.'));
       }
       updateGuard({ status: 'off-duty' });
       toast({ title: 'Checked Out', description: 'Your shift has been logged.' });
@@ -72,7 +75,7 @@ export default function Dashboard() {
       console.error('Check-out error:', err);
       toast({
         title: 'Check-out Failed',
-        description: 'Could not log your check-out. Please try again.',
+        description: errorMessage(err, 'Could not log your check-out. Please try again.'),
         variant: 'destructive',
       });
     } finally {
@@ -772,12 +775,16 @@ export default function Dashboard() {
                 {guard?.currentShift?.location || 'No shift scheduled'}
               </h3>
               <div className="flex items-center gap-4 mt-2 text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-sm">
-                    {guard?.currentShift?.startTime} - {guard?.currentShift?.endTime}
-                  </span>
-                </div>
+                {guard?.currentShift ? (
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm">
+                      {guard.currentShift.startTime} - {guard.currentShift.endTime}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-sm">No site assigned yet. Ask your supervisor.</span>
+                )}
               </div>
             </div>
             <div className="text-right">
@@ -787,13 +794,15 @@ export default function Dashboard() {
 
           <div className="flex gap-3">
             {!isCheckedIn ? (
-              <Button 
-                variant="gradient" 
+              // Without a site there is nowhere to check in to
+              <Button
+                variant="gradient"
                 className="flex-1"
                 onClick={() => navigate('/check-in')}
+                disabled={!hasSite}
               >
                 <LogIn className="w-5 h-5 mr-2" />
-                Check In
+                {hasSite ? 'Check In' : 'No site assigned yet'}
               </Button>
             ) : (
               <>
