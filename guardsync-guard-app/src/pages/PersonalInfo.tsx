@@ -24,8 +24,38 @@ import { BottomNav } from '@/components/BottomNav';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { errorMessage } from '@/lib/apiError';
+import { Guard } from '@/types/guard';
 
 type EditMode = 'none' | 'contact' | 'bank';
+
+// The guard record PUT /guards/:id/profile answers with (only the fields this page uses)
+interface SavedProfile {
+  address?: string | null;
+  emergencyContact?: string | null;
+  bankDetails?: Guard['bankDetails'] | null;
+  bankIfsc?: string | null;
+  bankName?: string | null;
+  accountHolderName?: string | null;
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  address: 'address',
+  emergencyContact: 'emergency contact',
+  bankAccountNumber: 'account number',
+  bankIfsc: 'IFSC code',
+  bankName: 'bank name',
+  accountHolderName: 'account holder name',
+};
+
+// Which of the sent fields the saved record does not show (the account number comes back masked)
+const fieldsNotSaved = (changes: Record<string, string>, saved: SavedProfile | undefined) =>
+  Object.entries(changes)
+    .filter(([field, value]) => {
+      if (field === 'bankAccountNumber') return !saved?.bankDetails?.accountNumber?.endsWith(value.slice(-4));
+      return saved?.[field as keyof SavedProfile] !== value;
+    })
+    .map(([field]) => FIELD_LABELS[field] || field);
 
 export default function PersonalInfo() {
   const navigate = useNavigate();
@@ -35,121 +65,122 @@ export default function PersonalInfo() {
   const [editMode, setEditMode] = useState<EditMode>('none');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Contact form state
-  const [contactForm, setContactForm] = useState({
-    phone: guard?.phone || '',
+  // Contact form state. The phone number is not here: only a supervisor can change it.
+  const contactFromGuard = () => ({
     address: guard?.address || '',
     emergencyContact: guard?.emergencyContact || '',
   });
+  const [contactForm, setContactForm] = useState(contactFromGuard);
 
-  // Bank form state
-  const [bankForm, setBankForm] = useState({
-    accountNumber: guard?.bankDetails?.accountNumber || '',
+  // Bank form state. The account number starts empty: the app only ever has the masked number,
+  // and saving that would overwrite the real one. It is sent only when the guard types a new one.
+  const bankFromGuard = () => ({
+    accountNumber: '',
     ifsc: guard?.bankDetails?.ifsc || '',
     bankName: guard?.bankDetails?.bankName || '',
     accountHolderName: guard?.bankDetails?.accountHolderName || '',
   });
+  const [bankForm, setBankForm] = useState(bankFromGuard);
+
+  // Each edit starts from what is saved now
+  const startEdit = (mode: EditMode) => {
+    setContactForm(contactFromGuard());
+    setBankForm(bankFromGuard());
+    setEditMode(mode);
+  };
 
   const handleCancelEdit = () => {
-    // Reset forms to original values
-    setContactForm({
-      phone: guard?.phone || '',
-      address: guard?.address || '',
-      emergencyContact: guard?.emergencyContact || '',
-    });
-    setBankForm({
-      accountNumber: guard?.bankDetails?.accountNumber || '',
-      ifsc: guard?.bankDetails?.ifsc || '',
-      bankName: guard?.bankDetails?.bankName || '',
-      accountHolderName: guard?.bankDetails?.accountHolderName || '',
-    });
     setEditMode('none');
   };
 
-  const handleSaveContact = async () => {
-    if (!guard?.id) return;
-
-    setIsSubmitting(true);
-    try {
-      const response = await api.put(`/guards/${guard.id}/profile`, {
-        address: contactForm.address,
-        emergencyContact: contactForm.emergencyContact,
-      });
-
-      if (response.success) {
-        updateGuard({
-          phone: contactForm.phone,
-          address: contactForm.address,
-          emergencyContact: contactForm.emergencyContact,
-        });
-        setEditMode('none');
-        toast({
-          title: 'Contact Updated',
-          description: 'Your contact information has been saved.',
-        });
-      } else {
-        throw new Error('Failed to update');
-      }
-    } catch (error) {
-      toast({
-        title: 'Update Failed',
-        description: 'Please try again later.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const showError = (description: string) => {
+    toast({ title: 'Update Failed', description, variant: 'destructive' });
   };
 
-  const handleSaveBank = async () => {
+  // Sends only the changed fields. The screen then shows what the server saved.
+  const saveProfile = async (changes: Record<string, string>, successTitle: string, successText: string) => {
     if (!guard?.id) return;
-
-    // Validate IFSC format
-    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-    if (!ifscRegex.test(bankForm.ifsc.toUpperCase())) {
-      toast({
-        title: 'Invalid IFSC',
-        description: 'Please enter a valid IFSC code',
-        variant: 'destructive',
-      });
+    if (Object.keys(changes).length === 0) {
+      setEditMode('none');
+      toast({ title: 'No changes', description: 'Nothing was changed.' });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const response = await api.put(`/guards/${guard.id}/profile`, {
-        bankAccountNumber: bankForm.accountNumber,
-        bankIfsc: bankForm.ifsc.toUpperCase(),
-        bankName: bankForm.bankName,
-        accountHolderName: bankForm.accountHolderName,
-      });
-
-      if (response.success) {
-        updateGuard({
-          bankDetails: {
-            accountNumber: bankForm.accountNumber,
-            ifsc: bankForm.ifsc.toUpperCase(),
-            bankName: bankForm.bankName,
-            accountHolderName: bankForm.accountHolderName,
-          },
-        });
-        setEditMode('none');
-        toast({
-          title: 'Bank Details Updated',
-          description: 'Your bank information has been saved.',
-        });
-      } else {
-        throw new Error('Failed to update');
+      const response = await api.put<SavedProfile>(`/guards/${guard.id}/profile`, changes);
+      if (!response.success) {
+        showError(errorMessage(response.error, 'Your changes were not saved. Please try again.'));
+        return;
       }
-    } catch (error) {
-      toast({
-        title: 'Update Failed',
-        description: 'Please try again later.',
-        variant: 'destructive',
+      const saved = response.data;
+      updateGuard({
+        address: saved?.address || undefined,
+        emergencyContact: saved?.emergencyContact || undefined,
+        bankDetails: {
+          accountNumber: saved?.bankDetails?.accountNumber || undefined,
+          ifsc: saved?.bankIfsc || undefined,
+          bankName: saved?.bankName || undefined,
+          accountHolderName: saved?.accountHolderName || undefined,
+        },
       });
+      setEditMode('none');
+      const notSaved = fieldsNotSaved(changes, saved);
+      if (notSaved.length > 0) {
+        showError(`These were not saved: ${notSaved.join(', ')}. Please try again or ask your supervisor.`);
+        return;
+      }
+      toast({ title: successTitle, description: successText });
+    } catch (error) {
+      showError(errorMessage(error, 'Your changes were not saved. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSaveContact = async () => {
+    const address = contactForm.address.trim();
+    const emergencyContact = contactForm.emergencyContact.trim();
+    const changes: Record<string, string> = {};
+    // A cleared field is left as it is (the server keeps the saved value)
+    if (address && address !== (guard?.address || '')) changes.address = address;
+    if (emergencyContact && emergencyContact !== (guard?.emergencyContact || '')) {
+      if (emergencyContact.length < 10 || emergencyContact.length > 15) {
+        showError('Emergency contact must be 10 to 15 characters.');
+        return;
+      }
+      changes.emergencyContact = emergencyContact;
+    }
+    await saveProfile(changes, 'Contact Updated', 'Your contact information has been saved.');
+  };
+
+  const handleSaveBank = async () => {
+    const accountNumber = bankForm.accountNumber.replace(/\s/g, '');
+    const ifsc = bankForm.ifsc.trim().toUpperCase();
+    const bankName = bankForm.bankName.trim();
+    const accountHolderName = bankForm.accountHolderName.trim();
+    const saved = guard?.bankDetails;
+    const changes: Record<string, string> = {};
+
+    if (accountNumber) {
+      if (!/^\d{9,18}$/.test(accountNumber)) {
+        showError('Account number must be 9 to 18 digits.');
+        return;
+      }
+      changes.bankAccountNumber = accountNumber;
+    }
+    if (ifsc && ifsc !== (saved?.ifsc || '')) {
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+        showError('Please enter a valid IFSC code (for example SBIN0001234).');
+        return;
+      }
+      changes.bankIfsc = ifsc;
+    }
+    if (bankName && bankName !== (saved?.bankName || '')) changes.bankName = bankName;
+    if (accountHolderName && accountHolderName !== (saved?.accountHolderName || '')) {
+      changes.accountHolderName = accountHolderName;
+    }
+    await saveProfile(changes, 'Bank Details Updated', 'Your bank information has been saved.');
   };
 
   const formatDate = (dateString?: string) => {
@@ -237,7 +268,7 @@ export default function PersonalInfo() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setEditMode('contact')}
+                  onClick={() => startEdit('contact')}
                   className="text-primary"
                 >
                   <Edit2 className="w-4 h-4 mr-1" />
@@ -253,11 +284,14 @@ export default function PersonalInfo() {
                   <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
-                    value={contactForm.phone}
-                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                    placeholder="+91 98765 43210"
+                    value={guard?.phone || ''}
+                    readOnly
+                    disabled
                     className="bg-secondary/50"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    To change your phone number, ask your supervisor.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="address">Address</Label>
@@ -377,7 +411,7 @@ export default function PersonalInfo() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setEditMode('bank')}
+                  onClick={() => startEdit('bank')}
                   className="text-primary"
                 >
                   <Edit2 className="w-4 h-4 mr-1" />
@@ -405,7 +439,11 @@ export default function PersonalInfo() {
                     id="accountNumber"
                     value={bankForm.accountNumber}
                     onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
-                    placeholder="Enter account number"
+                    placeholder={guard?.bankDetails?.accountNumber
+                      ? `Leave empty to keep ${guard.bankDetails.accountNumber}`
+                      : 'Enter account number'}
+                    inputMode="numeric"
+                    autoComplete="off"
                     className="bg-secondary/50"
                   />
                 </div>
