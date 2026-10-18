@@ -23,6 +23,7 @@ import { PatrolPoint, PatrolLog } from '@/types/guard';
 import { calculateDistance } from '@/lib/utils';
 import PatrolMap from '@/components/PatrolMap';
 import { logPatrolPoint } from '@/services/GuardAPI';
+import { errorMessage } from '@/lib/apiError';
 import {
   getCurrentPosition,
   checkPatrolPoint,
@@ -43,6 +44,8 @@ export default function PatrolMode() {
 
   const [patrolPoints, setPatrolPoints] = useState<PatrolPointStatus[]>([]);
   const [currentPosition, setCurrentPosition] = useState<GeolocationPosition | null>(null);
+  // True when the phone could not give a position (GPS off or permission refused)
+  const [locationUnavailable, setLocationUnavailable] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState<PatrolPointStatus | null>(null);
@@ -65,7 +68,7 @@ export default function PatrolMode() {
     // Try to use patrol route from logged-in guard's site
     if (site?.patrolRoute && site.patrolRoute.length > 0) {
       setSiteName(site.name);
-      points = site.patrolRoute.map((checkpoint: any) => ({
+      points = site.patrolRoute.map((checkpoint) => ({
         id: checkpoint.id,
         siteId: site.id,
         name: checkpoint.name,
@@ -97,6 +100,7 @@ export default function PatrolMode() {
     try {
       const position = await getCurrentPosition();
       setCurrentPosition(position);
+      setLocationUnavailable(false);
 
       // Update distances to patrol points
       setPatrolPoints((prev) =>
@@ -118,20 +122,10 @@ export default function PatrolMode() {
         description: 'Unable to get your location. Please enable GPS.',
         variant: 'destructive',
       });
-      // Use mock position for demo
-      const mockPosition: GeolocationPosition = {
-        latitude: 12.9716,
-        longitude: 77.5946,
-        accuracy: 10,
-        timestamp: Date.now(),
-      };
-      setCurrentPosition(mockPosition);
-      setPatrolPoints((prev) =>
-        prev.map((point, index) => ({
-          ...point,
-          distance: index * 15 + 5, // Mock increasing distances
-        }))
-      );
+      // Never make up a position: without one there are no distances and nothing is "in range"
+      setCurrentPosition(null);
+      setLocationUnavailable(true);
+      setPatrolPoints((prev) => prev.map((point) => ({ ...point, distance: undefined })));
     } finally {
       setIsLoading(false);
     }
@@ -141,8 +135,10 @@ export default function PatrolMode() {
   const handleCheckIn = async (point: PatrolPointStatus) => {
     if (!currentPosition) {
       toast({
-        title: 'Location Required',
-        description: 'Please wait for location to be detected',
+        title: locationUnavailable ? 'Location Unavailable' : 'Location Required',
+        description: locationUnavailable
+          ? 'Turn on GPS, then tap refresh to check in.'
+          : 'Please wait for location to be detected',
         variant: 'destructive',
       });
       return;
@@ -162,62 +158,27 @@ export default function PatrolMode() {
       );
 
       const withinRadius = distance <= point.radiusMeters;
+      setCurrentPosition(position);
 
-      // Create patrol log and persist to API
-      const logData = {
-        guardId: guard?.id || '1',
-        siteId: site?.id || point.siteId,
+      // Save the check-in. If the server does not accept it, it did not happen.
+      const response = await logPatrolPoint(guard?.id || '', {
         patrolPointId: point.id,
         patrolPointName: point.name,
         shiftId: guard?.currentShift?.id,
-        lat: position.latitude,
-        lng: position.longitude,
+        latitude: position.latitude,
+        longitude: position.longitude,
         withinRadius,
         distanceFromPoint: Math.round(distance),
-      };
-
-      // Persist to API
-      try {
-        const response = await logPatrolPoint(guard?.id || '', {
-          patrolPointId: point.id,
-          patrolPointName: point.name,
-          shiftId: guard?.currentShift?.id,
-          latitude: position.latitude,
-          longitude: position.longitude,
-          withinRadius: distance <= point.radius,
-          distanceFromPoint: Math.round(distance),
+      });
+      if (!response.success || !response.data) {
+        toast({
+          title: 'Check-in Not Saved',
+          description: errorMessage(response.error, 'Could not save this check-in. Please try again.'),
+          variant: 'destructive',
         });
-        
-        if (response.success && response.data) {
-          setPatrolLogs((prev) => [...prev, response.data!]);
-        } else {
-          // Fallback to local log if API fails
-          const localLog: PatrolLog = {
-            id: `pl-${Date.now()}`,
-            guardId: guard?.id || '',
-            patrolPointId: point.id,
-            patrolPointName: point.name,
-            shiftId: guard?.currentShift?.id,
-            latitude: position.latitude,
-            longitude: position.longitude,
-            withinRadius: distance <= point.radius,
-            distanceFromPoint: Math.round(distance),
-            timestamp: new Date().toISOString(),
-          };
-          setPatrolLogs((prev) => [...prev, localLog]);
-        }
-      } catch (apiErr) {
-        console.error('Failed to save patrol log to API:', apiErr);
-        // Fallback to local log
-        const localLog: PatrolLog = {
-          id: `pl-${Date.now()}`,
-          ...logData,
-          latitude: position.latitude,
-          longitude: position.longitude,
-          timestamp: new Date().toISOString(),
-        };
-        setPatrolLogs((prev) => [...prev, localLog]);
+        return;
       }
+      setPatrolLogs((prev) => [...prev, response.data!]);
 
       // Update patrol point status
       setPatrolPoints((prev) =>
@@ -352,6 +313,19 @@ export default function PatrolMode() {
           </CardContent>
         </Card>
 
+        {/* No position: say so instead of showing distances */}
+        {locationUnavailable && !isLoading && (
+          <div className="glass-card p-3 mb-6 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Location unavailable</p>
+              <p className="text-xs text-muted-foreground">Turn on GPS to check in, then tap refresh.</p>
+            </div>
+          </div>
+        )}
+
         {/* Patrol Map */}
         {viewMode === 'map' && !isLoading && patrolPoints.length > 0 && (
           <div className="mb-6">
@@ -371,12 +345,14 @@ export default function PatrolMode() {
                       <div>
                         <p className="font-medium text-foreground">Next: {nextPoint.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {nextPoint.distance !== undefined ? `${nextPoint.distance}m away` : 'Calculating...'}
+                          {nextPoint.distance !== undefined
+                            ? `${nextPoint.distance}m away`
+                            : locationUnavailable ? 'Location unavailable' : 'Calculating...'}
                         </p>
                       </div>
                     </div>
                     <Button
-                      variant={nextPoint.distance && nextPoint.distance <= nextPoint.radiusMeters ? 'gradient' : 'outline'}
+                      variant={nextPoint.distance !== undefined && nextPoint.distance <= nextPoint.radiusMeters ? 'gradient' : 'outline'}
                       size="sm"
                       onClick={() => handleCheckIn(nextPoint)}
                       disabled={isCheckingIn}
@@ -439,7 +415,7 @@ export default function PatrolMode() {
                                 ? 'bg-primary/10'
                                 : point.id === nextPoint?.id
                                 ? 'bg-green-500/20 animate-pulse'
-                                : point.distance && point.distance <= point.radiusMeters
+                                : point.distance !== undefined && point.distance <= point.radiusMeters
                                 ? 'bg-primary/20'
                                 : 'bg-secondary'
                             }`}
@@ -480,7 +456,7 @@ export default function PatrolMode() {
                                   {point.distance}m away
                                 </Badge>
                               )}
-                              {point.distance && point.distance <= point.radiusMeters && (
+                              {point.distance !== undefined && point.distance <= point.radiusMeters && (
                                 <Badge
                                   variant="outline"
                                   className="border-primary text-primary"
@@ -501,7 +477,7 @@ export default function PatrolMode() {
                         {!point.isCompleted && (
                           <Button
                             variant={
-                              point.distance && point.distance <= point.radiusMeters
+                              point.distance !== undefined && point.distance <= point.radiusMeters
                                 ? 'gradient'
                                 : 'outline'
                             }
