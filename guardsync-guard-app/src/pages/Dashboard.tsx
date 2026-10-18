@@ -2,13 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, Clock, LogIn, LogOut, Shield, ChevronRight, 
-  AlertTriangle, CheckCircle, TrendingUp, Bell, Truck,
+  AlertTriangle, CheckCircle, Bell,
   Navigation, CalendarDays, Moon, Send, X, Loader2, Scan,
   Phone
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -33,7 +32,9 @@ import {
   sendSOSAlert,
   clockOut,
   updateGuardLocation,
-  verifyFace
+  verifyFace,
+  getGuardStats,
+  GuardStats,
 } from '@/services/GuardAPI';
 import { descriptorToString } from '@/services/FaceApiService';
 import { errorMessage } from '@/lib/apiError';
@@ -83,9 +84,8 @@ export default function Dashboard() {
     }
   };
   
-  // Transport mode state
-  const [isTransportMode, setIsTransportMode] = useState(false);
-  const [transportStartTime, setTransportStartTime] = useState<Date | null>(null);
+  // The guard's real numbers from the server (a dash until they arrive)
+  const [guardStats, setGuardStats] = useState<GuardStats | null>(null);
   
   // Conveyance request state
   const [showConveyanceDialog, setShowConveyanceDialog] = useState(false);
@@ -496,28 +496,22 @@ export default function Dashboard() {
     return () => clearInterval(intervalId);
   }, [isCheckedIn, guard?.id]);
 
-  // Handle transport mode toggle
-  const handleTransportToggle = (enabled: boolean) => {
-    setIsTransportMode(enabled);
-    if (enabled) {
-      setTransportStartTime(new Date());
-      toast({
-        title: 'Transport Mode Activated',
-        description: 'Location updates every 30 seconds. Stay safe!',
-      });
-    } else {
-      setTransportStartTime(null);
-      toast({
-        title: 'Transport Mode Deactivated',
-        description: 'Normal tracking resumed.',
-      });
-    }
-  };
+  // Load the stats again after a check-in or check-out, which changes them
+  useEffect(() => {
+    if (!guard?.id) return;
+    let cancelled = false;
+    getGuardStats(guard.id).then((response) => {
+      if (!cancelled && response.success && response.data) setGuardStats(response.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [guard?.id, isCheckedIn]);
 
   const stats = [
-    { label: 'Hours This Week', value: '32.5', trend: '+2.5' },
-    { label: 'On-Time Rate', value: '98%', trend: '+3%' },
-    { label: 'Incidents', value: '0', trend: '0' },
+    { label: 'Shifts Worked', value: guardStats ? String(guardStats.shiftsCompleted ?? 0) : '–' },
+    { label: 'Attendance (30 days)', value: guardStats ? `${guardStats.attendanceRate ?? 0}%` : '–' },
+    { label: 'Patrol Check-ins', value: guardStats ? String(guardStats.patrolsCompleted ?? 0) : '–' },
   ];
 
   // Wake alert stats for night shift
@@ -737,12 +731,6 @@ export default function Dashboard() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            {isTransportMode && (
-              <Badge variant="outline" className="bg-warning/20 text-warning border-warning animate-pulse">
-                <Truck className="w-3 h-3 mr-1" />
-                Transit
-              </Badge>
-            )}
             {isNightShift() && isCheckedIn && (
               <Badge variant="outline" className="bg-primary/20 text-primary border-primary">
                 <Moon className="w-3 h-3 mr-1" />
@@ -849,27 +837,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Transport Mode Toggle (only when checked in) */}
-        {isCheckedIn && (
-          <div className="glass-card p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg ${isTransportMode ? 'bg-warning/20' : 'bg-secondary'} flex items-center justify-center`}>
-                <Truck className={`w-5 h-5 ${isTransportMode ? 'text-warning' : 'text-muted-foreground'}`} />
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Material Transport</p>
-                <p className="text-sm text-muted-foreground">
-                  {isTransportMode ? 'Active - 30s GPS updates' : 'Enable for transport duty'}
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={isTransportMode}
-              onCheckedChange={handleTransportToggle}
-            />
-          </div>
-        )}
-
         {/* Night Shift Wake Alert Stats */}
         {isNightShift() && isCheckedIn && wakeAlertLogs.length > 0 && (
           <div className="glass-card p-4 mb-6">
@@ -965,10 +932,6 @@ export default function Dashboard() {
             <div key={stat.label} className="glass-card p-4">
               <p className="text-2xl font-bold text-foreground">{stat.value}</p>
               <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
-              <div className="flex items-center gap-1 mt-2">
-                <TrendingUp className="w-3 h-3 text-primary" />
-                <span className="text-xs text-primary">{stat.trend}</span>
-              </div>
             </div>
           ))}
         </div>
@@ -992,7 +955,8 @@ export default function Dashboard() {
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <button 
+          <button
+            onClick={() => setShowSOSDialog(true)}
             className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -1001,7 +965,7 @@ export default function Dashboard() {
               </div>
               <div className="text-left">
                 <p className="font-medium text-foreground">Report Incident</p>
-                <p className="text-sm text-muted-foreground">Log security events</p>
+                <p className="text-sm text-muted-foreground">Alert the control room</p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, User, Phone, Mail, CreditCard, Shield, 
-  Settings, LogOut, ChevronRight, Camera, Award, CalendarDays
+import {
+  ArrowLeft, User, Phone, Mail, CreditCard, LogOut, ChevronRight, CalendarDays
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,12 +53,10 @@ export default function Profile() {
     }
   };
 
+  // Only screens that exist are listed
   const menuItems = [
     { icon: User, label: 'Personal Information', description: 'View & update your details', path: '/personal-info' },
-    { icon: Shield, label: 'Security Settings', description: 'Face ID, Password' },
-    { icon: Award, label: 'Certifications', description: 'View your qualifications' },
     { icon: CalendarDays, label: 'Leave History', description: 'View leave requests', path: '/leave' },
-    { icon: Settings, label: 'App Settings', description: 'Notifications, Theme' },
   ];
 
   return (
@@ -79,13 +76,8 @@ export default function Profile() {
         {/* Profile Card */}
         <div className="glass-card p-6 mb-6">
           <div className="flex items-center gap-4 mb-6">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center">
-                <User className="w-10 h-10 text-muted-foreground" />
-              </div>
-              <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
-                <Camera className="w-4 h-4 text-primary-foreground" />
-              </button>
+            <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center">
+              <User className="w-10 h-10 text-muted-foreground" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-foreground">{guard?.name}</h2>
@@ -171,7 +163,7 @@ export default function Profile() {
           {menuItems.map((item) => (
             <button
               key={item.label}
-              onClick={() => item.path && navigate(item.path)}
+              onClick={() => navigate(item.path)}
               className="w-full glass-card p-4 flex items-center justify-between hover:bg-accent transition-colors"
             >
               <div className="flex items-center gap-3">

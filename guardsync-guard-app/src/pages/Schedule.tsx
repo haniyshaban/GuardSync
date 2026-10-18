@@ -27,25 +27,35 @@ export default function Schedule() {
   const [apiSchedules, setApiSchedules] = useState<ScheduledShift[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // The dates to load: the past week and the next two weeks, plus whichever week is on screen
+  const { rangeFrom, rangeTo } = useMemo(() => {
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - 7);
+    const to = new Date(today);
+    to.setDate(today.getDate() + 14);
+    const weekStart = new Date(selectedDate);
+    weekStart.setDate(selectedDate.getDate() - selectedDate.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    return {
+      rangeFrom: (weekStart < from ? weekStart : from).toISOString().slice(0, 10),
+      rangeTo: (weekEnd > to ? weekEnd : to).toISOString().slice(0, 10),
+    };
+  }, [selectedDate]);
+
   // Fetch schedules from API
   useEffect(() => {
     if (!guard?.id) return;
+    // A reply for a range that is no longer on screen is ignored
+    let cancelled = false;
 
     const fetchSchedules = async () => {
       try {
-        // Get schedules for the past week and next 2 weeks
         const today = new Date();
-        const from = new Date(today);
-        from.setDate(today.getDate() - 7);
-        const to = new Date(today);
-        to.setDate(today.getDate() + 14);
+        const response = await getSchedules(guard.id, rangeFrom, rangeTo);
+        if (cancelled) return;
 
-        const response = await getSchedules(
-          guard.id,
-          from.toISOString().slice(0,10),
-          to.toISOString().slice(0,10)
-        );
-        
         if (response.success && response.data) {
           const todayStr = today.toISOString().slice(0, 10);
           
@@ -68,12 +78,15 @@ export default function Schedule() {
       } catch (err) {
         console.error('Failed to fetch schedules:', err);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchSchedules();
-  }, [guard?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [guard?.id, rangeFrom, rangeTo]);
 
   // Use API schedules if available, otherwise generate from guard's assigned shift
   const generatedShifts = useMemo(() => {
@@ -86,25 +99,24 @@ export default function Schedule() {
     if (!guard?.currentShift) return [];
     
     const shifts: ScheduledShift[] = [];
-    const today = new Date();
+    const todayStr = new Date().toISOString().split('T')[0];
     const isNightShift = guard.currentShift.isNightShift;
     const location = guard.currentShift.location || 'Assigned Site';
     const startTime = guard.currentShift.startTime || (isNightShift ? '20:00' : '08:00');
     const endTime = guard.currentShift.endTime || (isNightShift ? '08:00' : '20:00');
     
-    // Generate shifts for the past week and next 2 weeks
-    for (let i = -7; i < 14; i++) {
-      const shiftDate = new Date(today);
-      shiftDate.setDate(today.getDate() + i);
+    // Generate shifts for the same dates the API is asked for
+    const end = new Date(`${rangeTo}T12:00:00Z`);
+    for (const shiftDate = new Date(`${rangeFrom}T12:00:00Z`); shiftDate <= end; shiftDate.setUTCDate(shiftDate.getUTCDate() + 1)) {
       const dateStr = shiftDate.toISOString().split('T')[0];
-      
+
       // Skip some days to simulate realistic schedule (work 5 days, off 2)
-      const dayOfWeek = shiftDate.getDay();
+      const dayOfWeek = shiftDate.getUTCDay();
       if (dayOfWeek === 0) continue; // Skip Sundays
-      
+
       let status: 'upcoming' | 'completed' | 'today' = 'upcoming';
-      if (i < 0) status = 'completed';
-      else if (i === 0) status = 'today';
+      if (dateStr < todayStr) status = 'completed';
+      else if (dateStr === todayStr) status = 'today';
       
       shifts.push({
         id: `shift-${dateStr}`,
@@ -118,7 +130,7 @@ export default function Schedule() {
     }
     
     return shifts;
-  }, [guard, apiSchedules]);
+  }, [guard, apiSchedules, rangeFrom, rangeTo]);
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -138,6 +150,13 @@ export default function Schedule() {
   const weekDates = getWeekDates();
 
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+  // The chevrons move a week back or forward
+  const moveWeek = (weeks: number) => {
+    const date = new Date(selectedDate);
+    date.setDate(date.getDate() + weeks * 7);
+    setSelectedDate(date);
+  };
 
   const isToday = (date: Date) => {
     const today = new Date();
@@ -209,13 +228,21 @@ export default function Schedule() {
         {/* Week View */}
         <div className="glass-card p-4 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <button className="p-2 hover:bg-accent rounded-lg transition-colors">
+            <button
+              onClick={() => moveWeek(-1)}
+              aria-label="Previous week"
+              className="p-2 hover:bg-accent rounded-lg transition-colors"
+            >
               <ChevronLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <p className="font-semibold text-foreground">
               {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </p>
-            <button className="p-2 hover:bg-accent rounded-lg transition-colors">
+            <button
+              onClick={() => moveWeek(1)}
+              aria-label="Next week"
+              className="p-2 hover:bg-accent rounded-lg transition-colors"
+            >
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
