@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
+import { signToken } from '../auth.js';
 import { createTestDb, seedTestData, cleanupTestDb } from './helpers.js';
 
 // Mock the db module
@@ -115,6 +116,7 @@ vi.mock('../repositories/index.js', async () => {
 describe('Attendance API Tests', () => {
   let testData;
   let authToken;
+  let adminToken;
 
   beforeEach(async () => {
     testDb = createTestDb();
@@ -129,6 +131,7 @@ describe('Attendance API Tests', () => {
       });
     
     authToken = loginResponse.body.data.token;
+    adminToken = signToken({ id: testData.staffId, role: 'admin' });
   });
 
   afterEach(() => {
@@ -306,13 +309,24 @@ describe('Attendance API Tests', () => {
     });
 
     it('should return 400 with missing guardId', async () => {
+      // An admin clocking a guard out has to say which guard
       const response = await request(app)
         .post('/api/attendance/clock-out')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({})
         .expect(400);
 
       expect(response.body.success).toBe(false);
+    });
+
+    it('clocks a guard out as themselves, whatever guard id they send', async () => {
+      const response = await request(app)
+        .post('/api/attendance/clock-out')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ guardId: 'someone-else' })
+        .expect(200);
+
+      expect(response.body.data).toHaveProperty('guardId', testData.guardId);
     });
 
     it('should update guard clockedIn status to false', async () => {
@@ -424,11 +438,21 @@ describe('Attendance API Tests', () => {
     it('should return empty array when no records match filters', async () => {
       const response = await request(app)
         .get('/api/attendance?guardId=non-existent-guard')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual([]);
+    });
+
+    it('only ever gives a guard their own records', async () => {
+      const response = await request(app)
+        .get('/api/attendance?guardId=non-existent-guard')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.data.length).toBeGreaterThan(0);
+      expect(response.body.data.every(record => record.guardId === testData.guardId)).toBe(true);
     });
   });
 });

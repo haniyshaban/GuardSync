@@ -148,14 +148,14 @@ describe('Auth API Tests', () => {
 
       const token = loginResponse.body.data.token;
 
-      // Then access protected route
+      // Then access protected route (a guard reads their own record)
       const response = await request(app)
-        .get('/api/guards')
+        .get(`/api/guards/${testData.guardId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data).toHaveProperty('id', testData.guardId);
     });
 
     it('should return 401 with malformed Authorization header', async () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
+import { signToken } from '../auth.js';
 import { createTestDb, seedTestData, cleanupTestDb } from './helpers.js';
 
 // Mock the db module
@@ -70,6 +71,7 @@ vi.mock('../repositories/index.js', async () => {
 describe('Guards API Tests', () => {
   let testData;
   let authToken;
+  let adminToken;
 
   beforeEach(async () => {
     testDb = createTestDb();
@@ -84,6 +86,7 @@ describe('Guards API Tests', () => {
       });
     
     authToken = loginResponse.body.data.token;
+    adminToken = signToken({ id: testData.staffId, role: 'admin' });
   });
 
   afterEach(() => {
@@ -95,7 +98,7 @@ describe('Guards API Tests', () => {
     it('should return array of guards with authentication', async () => {
       const response = await request(app)
         .get('/api/guards')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -114,10 +117,17 @@ describe('Guards API Tests', () => {
       expect(response.body.error).toContain('Unauthorized');
     });
 
+    it('is not open to guards: they only read their own record', async () => {
+      await request(app)
+        .get('/api/guards')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403);
+    });
+
     it('should mask sensitive PII data', async () => {
       const response = await request(app)
         .get('/api/guards')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       const guard = response.body.data[0];
@@ -150,11 +160,18 @@ describe('Guards API Tests', () => {
     it('should return 404 for non-existent guard', async () => {
       const response = await request(app)
         .get('/api/guards/non-existent-id')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(404);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.message).toContain('not found');
+    });
+
+    it('does not let a guard open another guard\'s record', async () => {
+      await request(app)
+        .get('/api/guards/someone-else')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(403);
     });
 
     it('should return 401 without authentication', async () => {
