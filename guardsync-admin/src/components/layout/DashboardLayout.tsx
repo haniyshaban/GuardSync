@@ -40,8 +40,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background bg-grid">
-      {/* Global emergency overlay (shows whenever a guard has raised an SOS) */}
-      <EmergencyOverlay guards={guards} />
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
       {/* Mobile top bar */}
@@ -58,6 +56,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
 
       <main className={`${sidebarCollapsed ? 'sm:ml-[72px]' : 'sm:ml-64'} min-h-screen transition-all duration-200 animate-fade-in pt-12`}>
+        {/* Global emergency banner (shows whenever a guard has raised an SOS). It sits in the
+            page flow, so it pushes the page down instead of covering the menu or search. */}
+        <EmergencyOverlay guards={guards} />
+
         {/* Floating search button (top-right) */}
         <div className="fixed top-4 right-4 z-50 hidden sm:flex items-center gap-2">
           <Button

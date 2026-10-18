@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Guard } from '@/types';
 import { Button } from '@/components/ui/button';
-import { useSidebar } from './SidebarContext';
 
 interface EmergencyOverlayProps {
   guards?: Guard[];
@@ -32,16 +31,8 @@ function writeDismissed(ids: string[]) {
 const isEmergency = (g: Guard) => g.status === 'alert' || g.status === 'panic';
 
 export function EmergencyOverlay({ guards = [] }: EmergencyOverlayProps) {
-  const { collapsed } = useSidebar();
   const navigate = useNavigate();
-  const [isDesktop, setIsDesktop] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth >= 640 : true);
   const [dismissed, setDismissed] = useState<string[]>(readDismissed);
-
-  useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= 640);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   // Forget dismissals for guards who are no longer in an emergency, so a new SOS shows again
   useEffect(() => {
@@ -60,7 +51,6 @@ export function EmergencyOverlay({ guards = [] }: EmergencyOverlayProps) {
   // Early return AFTER all hooks
   if (!emergencyGuards.length) return null;
 
-  const leftOffset = isDesktop ? (collapsed ? '72px' : '16rem') : '0px';
   const first = emergencyGuards[0];
   const names = emergencyGuards.length === 1 ? first.name : `${first.name} +${emergencyGuards.length - 1} more`;
 
@@ -77,12 +67,13 @@ export function EmergencyOverlay({ guards = [] }: EmergencyOverlayProps) {
   };
 
   return (
+    // Sticks below the mobile top bar (53px tall) on phones and at the very top on wider
+    // screens, with room on the right for the floating Search button
     <div
       role="alert"
-      style={{ left: leftOffset, right: 0, width: `calc(100% - ${leftOffset})` }}
-      className="fixed top-0 z-[99999] flex items-center justify-between gap-4 p-3 px-4 bg-[hsl(var(--status-panic))] text-white shadow-lg"
+      className="sticky top-[53px] sm:top-0 z-[45] flex flex-wrap items-center justify-between gap-2 sm:gap-4 p-3 px-4 sm:pr-32 md:pr-48 bg-[hsl(var(--status-panic))] text-white shadow-lg"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="w-3 h-3 rounded-full bg-white/90 animate-pulse" />
         <div className="font-semibold">EMERGENCY: {names}</div>
         <div className="text-sm text-white/90 ml-2">SOS alert raised</div>
