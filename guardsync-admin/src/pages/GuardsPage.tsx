@@ -18,19 +18,33 @@ import {
   Clock
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
+import { isNotOnSite } from '@/lib/geofence';
+import { downloadCsv } from '@/lib/csv';
+
+type GuardFilter = Guard['status'] | 'all' | 'unassigned' | 'not-on-site';
+const STATUS_FILTERS = ['all', 'online', 'idle', 'offline', 'alert', 'panic', 'pending', 'unassigned'];
+const FILTER_BUTTONS: { value: GuardFilter; label: string }[] = [
+  ...STATUS_FILTERS.map(value => ({ value: value as GuardFilter, label: value })),
+  { value: 'not-on-site', label: 'not on site' },
+];
 
 export default function GuardsPage() {
   const [guards, setGuards] = useState<Guard[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<Guard['status'] | 'all' | 'unassigned'>('all');
+  const [statusFilter, setStatusFilter] = useState<GuardFilter>('all');
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // The filter follows the URL: ?status=online, ?filter=not-on-site (the dashboard's cards
+  // link here), or nothing for all guards (e.g. the sidebar's Guards link).
   useEffect(() => {
-    const param = searchParams.get('status');
-    const allowed = ['all', 'online', 'idle', 'offline', 'alert', 'panic', 'pending', 'unassigned'];
-    if (param && allowed.includes(param)) {
-      setStatusFilter(param as Guard['status'] | 'all' | 'unassigned');
+    const status = searchParams.get('status');
+    if (searchParams.get('filter') === 'not-on-site') {
+      setStatusFilter('not-on-site');
+    } else if (status && STATUS_FILTERS.includes(status)) {
+      setStatusFilter(status as GuardFilter);
+    } else {
+      setStatusFilter('all');
     }
   }, [searchParams]);
 
@@ -88,7 +102,8 @@ export default function GuardsPage() {
       (guard.phone || '').includes(searchQuery);
     let matchesStatus = false;
     if (statusFilter === 'all') matchesStatus = true;
-    else if (statusFilter === 'unassigned') matchesStatus = guard.siteId === null;
+    else if (statusFilter === 'unassigned') matchesStatus = !guard.siteId;
+    else if (statusFilter === 'not-on-site') matchesStatus = isNotOnSite(guard, sites);
     else matchesStatus = guard.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -100,7 +115,44 @@ export default function GuardsPage() {
   };
 
   const getStatusVariant = (status: Guard['status']): "online" | "offline" | "idle" | "alert" | "pending" | "secondary" => {
-    return status;
+    if (status === 'panic') return 'alert';
+    return (['online', 'offline', 'idle', 'alert', 'pending'] as const).find(v => v === status) ?? 'secondary';
+  };
+
+  // The guard's own shift comes first (same rule as the guard detail page), then the site's shifts
+  const getShiftLabel = (guard: Guard): string => {
+    const g = guard as any;
+    if (g.shiftType) {
+      const isDay = g.shiftType === 'day';
+      const start = g.shiftStartTime || (isDay ? '08:00' : '20:00');
+      const end = g.shiftEndTime || (isDay ? '20:00' : '08:00');
+      return `${isDay ? 'Day' : 'Night'} ${start}-${end}`;
+    }
+    const site = sites.find(s => s.id === guard.siteId);
+    if (!site) return '—';
+    const shifts = (site as any).shifts as any[] | undefined;
+    if (!shifts || shifts.length === 0) return '—';
+    const s = shifts.find(ss => ss.id === guard.currentShiftId);
+    return s ? (s.label || `${s.startTime}-${s.endTime}`) : '—';
+  };
+
+  // Downloads the guards currently shown (search and filter applied)
+  const exportGuards = () => {
+    downloadCsv(
+      `guards-${format(new Date(), 'yyyy-MM-dd')}.csv`,
+      ['Name', 'Employee ID', 'Phone', 'Email', 'Status', 'Assigned Site', 'Shift', 'Last Seen', 'Clocked In'],
+      filteredGuards.map(g => [
+        g.name || '',
+        g.employeeId || '',
+        g.phone || '',
+        g.email || '',
+        g.status,
+        getSiteName(g.siteId ?? null),
+        getShiftLabel(g),
+        g.lastSeen ? new Date(g.lastSeen).toISOString() : '',
+        g.clockedIn ? 'Yes' : 'No',
+      ])
+    );
   };
 
   return (
@@ -121,12 +173,10 @@ export default function GuardsPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-            <Button variant="outline" className="w-full sm:w-auto">
+            {/* Guards are added by enrolling in the guard app, then approved on their page */}
+            <Button variant="outline" className="w-full sm:w-auto" onClick={exportGuards} disabled={filteredGuards.length === 0}>
               <Download className="w-4 h-4 mr-2" />
               Export
-            </Button>
-            <Button variant="glow" className="w-full sm:w-auto">
-              Add Guard
             </Button>
           </div>
         </div>
@@ -148,19 +198,20 @@ export default function GuardsPage() {
               <div className="flex items-center gap-2 overflow-auto">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 <div className="flex gap-1">
-                  {(['all', 'online', 'idle', 'offline', 'alert', 'panic', 'pending', 'unassigned'] as const).map((status) => (
+                  {FILTER_BUTTONS.map(({ value, label }) => (
                     <Button
-                      key={status}
-                      variant={statusFilter === status ? 'default' : 'ghost'}
+                      key={value}
+                      variant={statusFilter === value ? 'default' : 'ghost'}
                       size="sm"
                       onClick={() => {
-                        setStatusFilter(status);
-                        if (status === 'all') setSearchParams({});
-                        else setSearchParams({ status });
+                        setStatusFilter(value);
+                        if (value === 'all') setSearchParams({});
+                        else if (value === 'not-on-site') setSearchParams({ filter: value });
+                        else setSearchParams({ status: value });
                       }}
-                      className="capitalize"
+                      className="capitalize whitespace-nowrap"
                     >
-                      {status}
+                      {label}
                     </Button>
                   ))}
                 </div>
@@ -219,23 +270,7 @@ export default function GuardsPage() {
                       </td>
                       <td className="p-4">
                         <div className="text-sm text-muted-foreground">
-                          {(() => {
-                            // The guard's own shift comes first (same rule as the guard detail page)
-                            const g = guard as any;
-                            if (g.shiftType) {
-                              const isDay = g.shiftType === 'day';
-                              const start = g.shiftStartTime || (isDay ? '08:00' : '20:00');
-                              const end = g.shiftEndTime || (isDay ? '20:00' : '08:00');
-                              return `${isDay ? 'Day' : 'Night'} ${start}-${end}`;
-                            }
-                            // Fallback to site shifts if defined
-                            const site = sites.find(s => s.id === guard.siteId);
-                            if (!site) return '—';
-                            const shifts = (site as any).shifts as any[] | undefined;
-                            if (!shifts || shifts.length === 0) return '—';
-                            const s = shifts.find(ss => ss.id === guard.currentShiftId);
-                            return s ? (s.label || `${s.startTime}-${s.endTime}`) : '—';
-                          })()}
+                          {getShiftLabel(guard)}
                         </div>
                       </td>
                       <td className="p-4">
@@ -255,9 +290,17 @@ export default function GuardsPage() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="icon">
-                            <Phone className="w-4 h-4" />
-                          </Button>
+                          {guard.phone ? (
+                            <Button variant="ghost" size="icon" asChild>
+                              <a href={`tel:${guard.phone}`} aria-label={`Call ${guard.name || 'guard'}`} title={`Call ${guard.phone}`}>
+                                <Phone className="w-4 h-4" />
+                              </a>
+                            </Button>
+                          ) : (
+                            <Button variant="ghost" size="icon" disabled aria-label="No phone number">
+                              <Phone className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Link to={`/guards/${guard.id}`}>
                             <Button variant="outline" size="sm">View</Button>
                           </Link>
