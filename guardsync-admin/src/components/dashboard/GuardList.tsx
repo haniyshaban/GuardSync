@@ -34,10 +34,9 @@ export function GuardList({
     }
   };
 
-  const sortedGuards = [...guards].sort((a, b) => {
-    const statusOrder = { alert: 0, online: 1, idle: 2, offline: 3 };
-    return statusOrder[a.status] - statusOrder[b.status];
-  });
+  // Emergencies first, pending enrolments last; a status missing here sorts with offline
+  const statusOrder: Record<string, number> = { panic: 0, alert: 0, online: 1, active: 1, idle: 2, offline: 3, unassigned: 4, pending: 5 };
+  const sortedGuards = [...guards].sort((a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
 
   return (
     <ScrollArea className={cn("pr-4")} style={{ maxHeight }}>
