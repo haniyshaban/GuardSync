@@ -8,7 +8,7 @@ import EmergencyOverlay from './EmergencyOverlay';
 import CommandSearch from '@/components/ui/CommandSearch';
 import { Guard } from '@/types';
 import { API_BASE_URL } from '@/lib/utils';
-import { fetchWithAuth } from '@/lib/api';
+import { fetchWithAuth, parseApiData } from '@/lib/api';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -26,7 +26,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       try {
         const res = await fetchWithAuth(`${API_BASE_URL}/api/guards`);
         if (res.ok) {
-          const data = await res.json();
+          const data = parseApiData(await res.json());
           if (Array.isArray(data)) setGuards(data);
         }
       } catch (e) {
@@ -34,13 +34,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     };
     loadGuards();
-    const interval = setInterval(loadGuards, 10000); // Poll every 10s for panic alerts
+    const interval = setInterval(loadGuards, 10000); // Poll every 10s for SOS alerts
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="min-h-screen bg-background bg-grid">
-      {/* Global emergency overlay (shows whenever any guard is in 'panic') */}
+      {/* Global emergency overlay (shows whenever a guard has raised an SOS) */}
       <EmergencyOverlay guards={guards} />
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
