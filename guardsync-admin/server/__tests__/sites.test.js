@@ -166,7 +166,7 @@ describe('Sites API Tests', () => {
         .get('/api/sites')
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should include location object with lat/lng', async () => {
@@ -230,7 +230,7 @@ describe('Sites API Tests', () => {
         .get(`/api/sites/${testData.siteId}`)
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
   });
 
@@ -269,7 +269,7 @@ describe('Sites API Tests', () => {
         .send(newSite)
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should return 400 with missing required fields', async () => {
@@ -310,7 +310,7 @@ describe('Sites API Tests', () => {
         .send({ name: 'Updated Name' })
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should return 404 for non-existent site', async () => {
@@ -339,7 +339,7 @@ describe('Sites API Tests', () => {
         .delete(`/api/sites/${testData.siteId}`)
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
   });
 });

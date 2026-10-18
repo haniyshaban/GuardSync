@@ -24,5 +24,6 @@ export const faceCheckLimiter = rateLimit({
 // Rate limiter for upload endpoints
 export const uploadLimiter = rateLimit({ 
   windowMs: 60 * 1000, // 1 minute
-  max: 30 // 30 requests per minute
+  max: 30, // 30 requests per minute
+  message: { success: false, error: { code: 'TOO_MANY_ATTEMPTS', message: 'Too many uploads. Try again in a minute.' } },
 });

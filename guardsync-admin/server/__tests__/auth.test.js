@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
+import { signToken } from '../auth.js';
 import { createTestDb, seedTestData, cleanupTestDb } from './helpers.js';
 
 // Mock the db module
@@ -124,7 +125,7 @@ describe('Auth API Tests', () => {
         .get('/api/guards')
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should return 401 with invalid token', async () => {
@@ -133,7 +134,7 @@ describe('Auth API Tests', () => {
         .set('Authorization', 'Bearer invalid-token-here')
         .expect(401);
 
-      expect(response.body.error).toContain('Invalid token');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should access protected route with valid token', async () => {
@@ -164,7 +165,47 @@ describe('Auth API Tests', () => {
         .set('Authorization', 'InvalidFormat token123')
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
+    });
+
+    it('answers a wrong role with 403 in the standard error shape', async () => {
+      const guardToken = signToken({ id: testData.guardId, role: 'guard' });
+      const response = await request(app)
+        .get('/api/guards')
+        .set('Authorization', `Bearer ${guardToken}`)
+        .expect(403);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: { code: 'FORBIDDEN', message: "You don't have permission to do this" },
+      });
+    });
+
+    it('answers 401 ACCOUNT_INACTIVE once the account is removed', async () => {
+      const guardToken = signToken({ id: testData.guardId, role: 'guard' });
+      testDb.prepare('DELETE FROM guards WHERE id = ?').run(testData.guardId);
+
+      const response = await request(app)
+        .get(`/api/guards/${testData.guardId}`)
+        .set('Authorization', `Bearer ${guardToken}`)
+        .expect(401);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: { code: 'ACCOUNT_INACTIVE', message: 'This account is no longer active' },
+      });
+    });
+
+    it('answers 401 ACCOUNT_INACTIVE for a disabled staff account', async () => {
+      const adminToken = signToken({ id: testData.staffId, role: 'admin' });
+      testDb.prepare("UPDATE staff SET status = 'disabled' WHERE id = ?").run(testData.staffId);
+
+      const response = await request(app)
+        .get('/api/guards')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(401);
+
+      expect(response.body.error.code).toBe('ACCOUNT_INACTIVE');
     });
   });
 });

@@ -208,7 +208,7 @@ describe('Attendance API Tests', () => {
         .send(clockInData)
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should return 400 with missing required fields', async () => {
@@ -305,7 +305,7 @@ describe('Attendance API Tests', () => {
         .send({ guardId: testData.guardId })
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should return 400 with missing guardId', async () => {
@@ -432,7 +432,7 @@ describe('Attendance API Tests', () => {
         .get('/api/attendance')
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should return empty array when no records match filters', async () => {

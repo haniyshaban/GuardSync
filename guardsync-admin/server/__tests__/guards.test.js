@@ -114,7 +114,7 @@ describe('Guards API Tests', () => {
         .get('/api/guards')
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('is not open to guards: they only read their own record', async () => {
@@ -179,7 +179,7 @@ describe('Guards API Tests', () => {
         .get(`/api/guards/${testData.guardId}`)
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
   });
 
@@ -290,7 +290,7 @@ describe('Guards API Tests', () => {
         .send({ name: 'Updated Name' })
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
 
     it('should return 404 for non-existent guard', async () => {
@@ -319,7 +319,7 @@ describe('Guards API Tests', () => {
         .delete(`/api/guards/${testData.guardId}`)
         .expect(401);
 
-      expect(response.body.error).toContain('Unauthorized');
+      expect(response.body.error).toEqual({ code: 'UNAUTHORIZED', message: 'Please log in again' });
     });
   });
 });

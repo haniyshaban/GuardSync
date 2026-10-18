@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import logger from './logger.js';
 import db from './db.js';
+import { error } from './utils/responses.js';
 
 // JWT Secret Configuration
 // In production: MUST be set via environment variable
@@ -54,29 +55,34 @@ function accountIsActive(decoded) {
   return !!staff && !['disabled', 'inactive', 'suspended'].includes(staff.status);
 }
 
+// Refusals use the same reply shape as every other error, with messages the apps can show as they are
+const notLoggedIn = (res) => error(res, 401, 'UNAUTHORIZED', 'Please log in again');
+
 export function authMiddleware(required = true, roles = []) {
   return (req, res, next) => {
     const auth = req.headers.authorization || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
 
     if (!token) {
-      if (required) return res.status(401).json({ error: 'Unauthorized' });
+      if (required) return notLoggedIn(res);
       return next();
     }
 
+    let decoded;
     try {
-      const decoded = verifyToken(token);
-      if (!accountIsActive(decoded)) {
-        return res.status(401).json({ error: 'Account is no longer active' });
-      }
-      req.user = decoded;
-      if (roles.length && !roles.includes(decoded.role)) {
-        return res.status(403).json({ error: 'Forbidden' });
-      }
-      return next();
+      decoded = verifyToken(token);
     } catch (e) {
-      return res.status(401).json({ error: 'Invalid token' });
+      return notLoggedIn(res); // expired, tampered with, or not a token at all
     }
+    if (!accountIsActive(decoded)) {
+      return error(res, 401, 'ACCOUNT_INACTIVE', 'This account is no longer active');
+    }
+    req.user = decoded;
+    if (roles.length && !roles.includes(decoded.role)) {
+      return error(res, 403, 'FORBIDDEN', "You don't have permission to do this");
+    }
+    // Outside the try above, so an error in the route itself is not reported as a bad token
+    return next();
   };
 }
 
