@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SystemConfig } from '@/types';
 import { API_BASE_URL } from '@/lib/utils';
-import { fetchWithAuth } from '@/lib/api';
+import { fetchJson, fetchWithAuth, parseApiData } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Settings, 
   Clock, 
@@ -29,30 +30,40 @@ const defaultSystemConfig: SystemConfig = {
   autoClockOut: true,
 };
 
+// The settings the server stores; nothing else is read from or sent to /api/config
+const CONFIG_KEYS = ['usePremiumAPIs', 'faceRecognition', 'mapProvider', 'locationUpdateInterval', 'geofenceStrictness', 'autoClockOut'] as const;
+
+function pickConfig(data: unknown): SystemConfig {
+  const source = (data && typeof data === 'object' ? data : {}) as Partial<SystemConfig>;
+  const config = { ...defaultSystemConfig };
+  for (const key of CONFIG_KEYS) {
+    if (source[key] !== undefined && source[key] !== null) (config as Record<string, unknown>)[key] = source[key];
+  }
+  return config;
+}
+
 export default function SettingsPage() {
   const [config, setConfig] = useState<SystemConfig>(defaultSystemConfig);
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
+
+  // Shows what the server holds (the reply is {success, data: config})
+  const fetchConfig = useCallback(async () => {
+    const res = await fetchWithAuth(`${API_BASE_URL}/api/config`);
+    if (res.ok) {
+      setConfig(pickConfig(parseApiData(await res.json())));
+    }
+  }, []);
 
   // Load config from API on mount
   useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const res = await fetchWithAuth(`${API_BASE_URL}/api/config`);
-        if (res.ok) {
-          const data = await res.json();
-          setConfig(prev => ({ ...prev, ...data }));
-        }
-      } catch (err) {
-        console.error('Failed to fetch config:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchConfig();
-  }, []);
+    fetchConfig()
+      .catch((err) => console.error('Failed to fetch config:', err))
+      .finally(() => setIsLoading(false));
+  }, [fetchConfig]);
 
   const updateConfig = <K extends keyof SystemConfig>(key: K, value: SystemConfig[K]) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -62,14 +73,11 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      });
-      
-      if (!res.ok) throw new Error('Failed to save');
-      
+      // Only the settings themselves are sent (the server replaces all of them)
+      const body = Object.fromEntries(CONFIG_KEYS.map(key => [key, config[key]]));
+      await fetchJson(`${API_BASE_URL}/api/config`, 'PUT', body);
+      await fetchConfig();
+
       toast({
         title: "Settings saved",
         description: "Your configuration has been saved to the database.",
@@ -79,7 +87,7 @@ export default function SettingsPage() {
       console.error('Save failed:', err);
       toast({
         title: "Save failed",
-        description: "Could not save settings to the server.",
+        description: err instanceof Error ? err.message : "Could not save settings to the server.",
         variant: "destructive",
       });
     } finally {
@@ -108,11 +116,12 @@ export default function SettingsPage() {
             <div>
               <h1 className="text-xl font-bold text-foreground">System Configuration</h1>
               <p className="text-sm text-muted-foreground">
-                Configure API providers and system settings
+                {isAdmin ? 'Configure API providers and system settings' : 'Only an admin can change these settings'}
               </p>
             </div>
           </div>
 
+          {isAdmin && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
             <Button variant="outline" onClick={handleReset} disabled={!hasChanges || isSaving} className="w-full sm:w-auto">
               <RotateCcw className="w-4 h-4 mr-2" />
@@ -127,6 +136,7 @@ export default function SettingsPage() {
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
+          )}
         </div>
 
         {/* Other Settings */}
@@ -152,7 +162,8 @@ export default function SettingsPage() {
                   value={config.locationUpdateInterval}
                   onChange={(e) => updateConfig('locationUpdateInterval', parseInt(e.target.value) || 30)}
                   min={10}
-                  max={120}
+                  max={300}
+                  disabled={!isAdmin}
                 />
                 <p className="text-xs text-muted-foreground">
                   How often guard locations are updated
@@ -165,6 +176,7 @@ export default function SettingsPage() {
                   id="geofence-strictness"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
                   value={config.geofenceStrictness}
+                  disabled={!isAdmin}
                   onChange={(e) => updateConfig('geofenceStrictness', e.target.value as 'low' | 'medium' | 'high')}
                 >
                   <option value="low">Low - Allow some tolerance</option>
@@ -182,6 +194,7 @@ export default function SettingsPage() {
                   <Switch
                     id="auto-clockout"
                     checked={config.autoClockOut}
+                    disabled={!isAdmin}
                     onCheckedChange={(checked) => updateConfig('autoClockOut', checked)}
                   />
                 </div>
