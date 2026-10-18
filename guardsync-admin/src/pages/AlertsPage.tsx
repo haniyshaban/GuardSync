@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Guard, Site, AttendanceLog } from '@/types';
 import { toast as sonnerToast } from '@/components/ui/sonner';
 import { API_BASE_URL } from '@/lib/utils';
-import { fetchWithAuth, parseApiData } from '@/lib/api';
+import { fetchJson, fetchWithAuth, parseApiData } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { 
   Bell, 
@@ -35,13 +36,38 @@ interface SOSAlert {
   resolvedNotes?: string;
 }
 
+// Missed check-ins acknowledged in this browser session (storage access may be blocked)
+const ACKNOWLEDGED_KEY = 'guardsync_acknowledged_alerts';
+
+function readAcknowledged(): string[] {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(ACKNOWLEDGED_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeAcknowledged(ids: string[]) {
+  try {
+    sessionStorage.setItem(ACKNOWLEDGED_KEY, JSON.stringify(ids));
+  } catch {
+    // Storage unavailable: the card stays hidden until the page is reloaded
+  }
+}
+
+const timeAgo = (value?: string) =>
+  value && !isNaN(Date.parse(value)) ? formatDistanceToNow(new Date(value), { addSuffix: true }) : 'just now';
+
 export default function AlertsPage() {
+  const { user } = useAuth();
   const [sosAlerts, setSosAlerts] = useState<SOSAlert[]>([]);
   const [guards, setGuards] = useState<Guard[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [acknowledged, setAcknowledged] = useState<string[]>(readAcknowledged);
 
   // Fetch guards from API
   useEffect(() => {
@@ -88,7 +114,7 @@ export default function AlertsPage() {
         const today = new Date().toISOString().slice(0, 10);
         const res = await fetchWithAuth(`${API_BASE_URL}/api/attendance?date=${today}`);
         if (res.ok) {
-          const data = await res.json();
+          const data = parseApiData(await res.json());
           if (Array.isArray(data)) {
             setAttendanceLogs(data);
           }
@@ -106,8 +132,9 @@ export default function AlertsPage() {
       try {
         const res = await fetchWithAuth(`${API_BASE_URL}/api/sos-alerts?status=active`);
         if (res.ok) {
-          const data = await res.json();
-          setSosAlerts(data);
+          // The reply is {success, data: [...]}; keep only the list
+          const data = parseApiData(await res.json());
+          setSosAlerts(Array.isArray(data) ? data : []);
         }
       } catch (err) {
         console.error('Failed to fetch SOS alerts:', err);
@@ -123,22 +150,31 @@ export default function AlertsPage() {
     return () => clearInterval(interval);
   }, [refreshKey]);
 
-  // Resolve SOS alert
+  // Resolve SOS alert (the server also takes the guard out of 'alert')
   const handleResolveSOS = async (alertId: string) => {
     try {
-      const res = await fetchWithAuth(`${API_BASE_URL}/api/sos-alerts/${alertId}/resolve`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resolvedBy: 'Admin', resolvedNotes: 'Resolved from dashboard' }),
+      await fetchJson(`${API_BASE_URL}/api/sos-alerts/${encodeURIComponent(alertId)}/resolve`, 'PUT', {
+        resolvedBy: user?.name || user?.email || 'Control room',
+        resolvedNotes: 'Resolved from dashboard',
       });
-      if (!res.ok) throw new Error('Failed to resolve');
       setSosAlerts(prev => prev.filter(a => a.id !== alertId));
+      setRefreshKey(k => k + 1);
       sonnerToast.success('SOS Alert resolved');
     } catch (err) {
       console.error('Resolve failed:', err);
-      sonnerToast.error('Failed to resolve SOS alert');
+      sonnerToast.error(err instanceof Error ? err.message : 'Failed to resolve SOS alert');
     }
   };
+
+  // A missed check-in can't be cleared on the server (it is worked out from today's clock-ins),
+  // so acknowledging it only hides the card for this session; the guard's status is not changed.
+  const handleAcknowledge = (guardId: string) => {
+    const next = Array.from(new Set([...acknowledged, guardId]));
+    writeAcknowledged(next);
+    setAcknowledged(next);
+  };
+
+  const phoneOf = (guardId: string) => guards.find(g => g.id === guardId)?.phone;
 
   // Guard alerts (missed check-ins, status alerts)
   const missed = guards.filter(g => {
@@ -157,13 +193,14 @@ export default function AlertsPage() {
   missed.forEach(g => { if (!alertMap.has(g.id)) alertMap.set(g.id, { guard: g, reason: 'missed' }); });
   const alertGuards = Array.from(alertMap.values()).map(v => v.guard);
 
-  const alertsToRender = alertGuards.map(g => {
-    const attendance = attendanceLogs.find(l => l.guardId === g.id);
-    const isMissed = attendance ? (new Date(attendance.clockIn).toDateString() !== new Date().toDateString()) : (!g.clockInTime || new Date(g.clockInTime).toDateString() !== new Date().toDateString());
-    return { guard: g, isMissed };
-  });
+  // Guards with an open SOS are listed (and resolved) in the SOS section above
+  const sosGuardIds = new Set(sosAlerts.map(a => a.guardId));
+  const alertsToRender = alertGuards
+    .filter(g => !sosGuardIds.has(g.id) && !acknowledged.includes(g.id))
+    // Status 'alert' means the guard raised an SOS; the other cards are missed check-ins
+    .map(g => ({ guard: g, isSos: g.status === 'alert' || g.status === 'panic' }));
 
-  const totalAlerts = sosAlerts.length + alertGuards.length;
+  const totalAlerts = sosAlerts.length + alertsToRender.length;
 
   return (
     <DashboardLayout>
@@ -240,7 +277,7 @@ export default function AlertsPage() {
                         <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true })}
+                            {timeAgo(alert.createdAt)}
                           </span>
                           {alert.location && (
                             <a 
@@ -257,10 +294,19 @@ export default function AlertsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="border-primary">
-                        <Phone className="w-4 h-4 mr-1" />
-                        Call
-                      </Button>
+                      {phoneOf(alert.guardId) ? (
+                        <Button variant="outline" size="sm" className="border-primary" asChild>
+                          <a href={`tel:${phoneOf(alert.guardId)}`}>
+                            <Phone className="w-4 h-4 mr-1" />
+                            Call
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" className="border-primary" disabled>
+                          <Phone className="w-4 h-4 mr-1" />
+                          Call
+                        </Button>
+                      )}
                       <Link to={`/guards/${alert.guardId}`}>
                         <Button variant="ghost" size="sm">View Guard</Button>
                       </Link>
@@ -290,7 +336,7 @@ export default function AlertsPage() {
               </h2>
             )}
             
-            {alertsToRender.map(({ guard, isMissed }, index) => (
+            {alertsToRender.map(({ guard, isSos }, index) => (
               <Card 
                 key={guard.id}
                 variant="elevated"
@@ -309,7 +355,7 @@ export default function AlertsPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{guard.name || 'Unknown Guard'}</p>
-                          <Badge variant="alert">{isMissed ? 'Missed Check-in' : 'Alert'}</Badge>
+                          <Badge variant="alert">{isSos ? 'SOS' : 'Missed Check-in'}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground font-mono">{guard.employeeId || 'N/A'}</p>
                         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
@@ -319,31 +365,26 @@ export default function AlertsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
-                        Contact
-                      </Button>
+                      {guard.phone ? (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={`tel:${guard.phone}`}>Contact</a>
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" disabled>
+                          Contact
+                        </Button>
+                      )}
                       <Link to={`/guards/${guard.id}`}>
                         <Button variant="ghost" size="sm">View Guard Details</Button>
                       </Link>
-                      <Button variant="success" size="sm" onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          const res = await fetchWithAuth(`${API_BASE_URL}/api/guards/${guard.id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: 'idle', lastSeen: new Date().toISOString() }),
-                          });
-                          if (!res.ok) throw new Error('Failed to update guard');
-                          // Refresh guards list
-                          setRefreshKey(k => k + 1);
-                          sonnerToast.success('Alert resolved');
-                        } catch (err) {
-                          console.error('Resolve failed', err);
-                          sonnerToast.error('Failed to resolve alert');
-                        }
-                      }}>
+                      <Button
+                        variant="success"
+                        size="sm"
+                        title="Hide this card for this session"
+                        onClick={(e) => { e.stopPropagation(); handleAcknowledge(guard.id); }}
+                      >
                         <CheckCircle className="w-4 h-4 mr-1" />
-                        Resolve
+                        Acknowledge
                       </Button>
                     </div>
                   </div>
