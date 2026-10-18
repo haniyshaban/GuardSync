@@ -154,10 +154,22 @@ router.put('/:id', authMiddleware(true, ['staff', 'admin']), validate(updateGuar
       return forbidden(res, 'Pending enrolments are approved or rejected with their own actions');
     }
 
+    // The email is the guard's login, so it has to stay unique
+    if (g.email !== undefined && g.email.toLowerCase() !== String(currentGuard.email || '').toLowerCase()) {
+      const taken = db.prepare('SELECT id FROM guards WHERE lower(email) = lower(?) AND id != ?').get(g.email, req.params.id);
+      if (taken) return conflict(res, 'Another guard already uses this email');
+    }
+
+    // A guard can only be assigned to a site that exists
+    if (g.siteId && !db.prepare('SELECT id FROM sites WHERE id = ?').get(g.siteId)) {
+      return badRequest(res, 'Unknown site');
+    }
+
     // Merge with existing data - only update fields that are provided
     const merged = {
       name: g.name !== undefined ? g.name : currentGuard.name,
       phone: g.phone !== undefined ? g.phone : currentGuard.phone,
+      email: g.email !== undefined ? g.email : currentGuard.email,
       employeeId: g.employeeId !== undefined ? g.employeeId : currentGuard.employeeId,
       siteId: g.siteId !== undefined ? (g.siteId || null) : currentGuard.siteId,
       status: g.status !== undefined ? g.status : currentGuard.status,
@@ -168,6 +180,11 @@ router.put('/:id', authMiddleware(true, ['staff', 'admin']), validate(updateGuar
       clockedIn: g.clockedIn !== undefined ? (g.clockedIn ? 1 : 0) : currentGuard.clockedIn,
       clockInTime: g.clockInTime !== undefined ? (g.clockInTime || null) : currentGuard.clockInTime,
       currentShiftId: g.currentShiftId !== undefined ? (g.currentShiftId || null) : currentGuard.currentShiftId,
+      dailyRate: g.dailyRate !== undefined ? g.dailyRate : currentGuard.dailyRate,
+      dateOfJoining: g.dateOfJoining !== undefined ? g.dateOfJoining : currentGuard.dateOfJoining,
+      shiftType: g.shiftType !== undefined ? g.shiftType : currentGuard.shiftType,
+      shiftStartTime: g.shiftStartTime !== undefined ? g.shiftStartTime : currentGuard.shiftStartTime,
+      shiftEndTime: g.shiftEndTime !== undefined ? g.shiftEndTime : currentGuard.shiftEndTime,
     };
     
     // Determine status: if siteId is being set to null and guard isn't pending, set to unassigned
@@ -183,7 +200,8 @@ router.put('/:id', authMiddleware(true, ['staff', 'admin']), validate(updateGuar
     
     // Use transaction to update both guards table and site_guards table
     const transaction = db.transaction(() => {
-      const update = db.prepare('UPDATE guards SET name=@name,phone=@phone,employeeId=@employeeId,siteId=@siteId,status=@status,lastSeen=@lastSeen,lat=@lat,lng=@lng,locationHistory=@locationHistory,clockedIn=@clockedIn,clockInTime=@clockInTime,currentShiftId=@currentShiftId WHERE id=@id');
+      const update = db.prepare(`UPDATE guards SET name=@name,phone=@phone,email=@email,employeeId=@employeeId,siteId=@siteId,status=@status,lastSeen=@lastSeen,lat=@lat,lng=@lng,locationHistory=@locationHistory,clockedIn=@clockedIn,clockInTime=@clockInTime,currentShiftId=@currentShiftId,
+        dailyRate=@dailyRate,dateOfJoining=@dateOfJoining,shiftType=@shiftType,shiftStartTime=@shiftStartTime,shiftEndTime=@shiftEndTime WHERE id=@id`);
       update.run({
         id: req.params.id,
         ...merged

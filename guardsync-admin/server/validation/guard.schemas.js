@@ -22,27 +22,30 @@ export const enrollGuardSchema = z.object({
   relieving_letter_url: z.string().url().optional().nullable(),
 });
 
-// Update guard schema (partial update)
+// Update guard schema (partial update, staff and admin).
+// PII (address, emergency contact, ID and bank details) is not changed here: it is saved,
+// encrypted, through PUT /api/guards/:id/profile.
 export const updateGuardSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   phone: commonSchemas.phone.optional(),
   email: commonSchemas.email.optional(),
   employeeId: z.string().min(1).max(50).optional(),
-  siteId: z.string().nullable().optional(),
+  siteId: z.string().nullable().optional(), // null = unassign
   status: z.enum(['pending', 'active', 'idle', 'offline', 'online', 'unassigned', 'alert']).optional(),
   lastSeen: commonSchemas.datetimeISO.optional(),
   location: commonSchemas.location.nullable().optional(),
+  // Entries written by the server carry `timestamp`; the demo data uses `at`
   locationHistory: z.array(z.object({
     lat: z.number(),
     lng: z.number(),
-    timestamp: z.string(),
+    timestamp: z.string().optional(),
+    at: z.string().optional(),
   })).optional(),
   clockedIn: z.boolean().optional(),
   clockInTime: z.string().nullable().optional(),
   currentShiftId: z.string().nullable().optional(),
-  address: z.string().max(500).optional(),
-  emergencyContact: z.string().min(10).max(15).optional(),
   dailyRate: z.number().min(0).optional(),
+  dateOfJoining: commonSchemas.dateISO.optional(),
   shiftType: z.enum(['day', 'night', 'rotating']).optional(),
   shiftStartTime: commonSchemas.time.optional(),
   shiftEndTime: commonSchemas.time.optional(),
