@@ -68,7 +68,9 @@ export const updateGuardProfileSchema = z.object({
   emergencyContact: z.string().min(10).max(15).optional(),
   aadharNumber: z.string().length(12).regex(/^\d+$/).optional(),
   panNumber: z.string().length(10).regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).optional(),
-  bankAccountNumber: z.string().min(9).max(18).optional(),
+  // Digits only: the apps show the saved number masked (XXXXXX1234), and that mask must never
+  // be saved over the real number
+  bankAccountNumber: z.string().min(9).max(18).regex(/^\d+$/, 'Account number must contain only digits').optional(),
   bankIfsc: z.string().length(11).regex(/^[A-Z]{4}0[A-Z0-9]{6}$/).optional(),
   bankName: z.string().max(100).optional(),
   accountHolderName: z.string().max(100).optional(),

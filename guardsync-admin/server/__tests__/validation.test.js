@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
 import { signToken } from '../auth.js';
-import { decrypt } from '../encryption.js';
+import { encrypt, decrypt } from '../encryption.js';
 import { validate, validateQuery } from '../validation/index.js';
 import { updateGuardSchema, updateGuardProfileSchema } from '../validation/guard.schemas.js';
 import { clockInSchema } from '../validation/attendance.schemas.js';
@@ -159,5 +159,19 @@ describe('Routes see the fields that were sent', () => {
     expect(decrypt(row.address)).toBe('MG Road, Bangalore');
     expect(decrypt(row.emergencyContact)).toBe('+91 9000000099');
     expect(decrypt(row.bankName)).toBe('Canara Bank');
+  });
+
+  it('never saves the masked bank account number over the real one', async () => {
+    testDb.prepare('UPDATE guards SET bankAccountNumber = ? WHERE id = ?').run(encrypt('1234567890002'), testData.guardId);
+
+    const response = await request(app)
+      .put(`/api/guards/${testData.guardId}/profile`)
+      .set('Authorization', `Bearer ${guardToken}`)
+      .send({ bankAccountNumber: 'XXXXXX0002', bankName: 'Canara Bank' })
+      .expect(400);
+    expect(response.body.error.message).toBe('bankAccountNumber: Account number must contain only digits');
+
+    const row = testDb.prepare('SELECT bankAccountNumber FROM guards WHERE id = ?').get(testData.guardId);
+    expect(decrypt(row.bankAccountNumber)).toBe('1234567890002');
   });
 });
