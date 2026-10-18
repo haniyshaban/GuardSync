@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/command';
 import { Guard, Site } from '@/types';
 import { API_BASE_URL } from '@/lib/utils';
-import { fetchWithAuth } from '@/lib/api';
+import { fetchWithAuth, parseApiData } from '@/lib/api';
 
 type Item = {
   id: string;
@@ -34,12 +34,13 @@ export default function CommandSearch() {
           fetchWithAuth(`${API_BASE_URL}/api/guards`),
           fetchWithAuth(`${API_BASE_URL}/api/sites`),
         ]);
+        // Replies are {success, data: [...]}
         if (guardsRes.ok) {
-          const data = await guardsRes.json();
+          const data = parseApiData(await guardsRes.json());
           if (Array.isArray(data)) setGuards(data);
         }
         if (sitesRes.ok) {
-          const data = await sitesRes.json();
+          const data = parseApiData(await sitesRes.json());
           if (Array.isArray(data)) setSites(data);
         }
       } catch (e) {
