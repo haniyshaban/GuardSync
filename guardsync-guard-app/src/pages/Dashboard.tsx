@@ -373,6 +373,12 @@ export default function Dashboard() {
           title: 'Request Cancelled',
           description: 'Your conveyance request has been cancelled.',
         });
+      } else {
+        toast({
+          title: 'Could Not Cancel',
+          description: errorMessage(response.error, 'Failed to cancel request'),
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       toast({
