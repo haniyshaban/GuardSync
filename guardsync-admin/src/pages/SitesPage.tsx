@@ -8,9 +8,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Guard, Site } from '@/types';
 import { API_BASE_URL } from '@/lib/utils';
-import { fetchWithAuth, parseApiData } from '@/lib/api';
-import { useState, useEffect } from 'react';
+import { fetchJson, fetchWithAuth, getApiErrorMessage, parseApiData } from '@/lib/api';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { siteFromImport } from '@/lib/siteImport';
 import { MapContainer, TileLayer, Marker, Polygon, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -34,6 +35,7 @@ export default function SitesPage() {
   const [radiusValue, setRadiusValue] = useState<number>(100);
   const [polygonText, setPolygonText] = useState<string>('');
   const [polygonPoints, setPolygonPoints] = useState<{lat:number;lng:number}[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   const { toast } = useToast();
 
@@ -58,48 +60,100 @@ export default function SitesPage() {
     loadGuards();
   }, []);
 
-  // Load sites from backend on mount
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetchWithAuth(`${API_BASE_URL}/api/sites`);
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error('Failed to load sites:', res.status, errorText);
-          throw new Error(`HTTP ${res.status}: ${errorText}`);
-        }
-        const json = await res.json();
-        const data = parseApiData(json);
-        if (cancelled) return;
-        if (Array.isArray(data)) {
-          // normalize types
-          const rev = data.map((s: any) => ({
-            ...s,
-            createdAt: s.createdAt ? new Date(s.createdAt) : new Date(),
-            geofenceRadius: s.geofenceRadius ? Number(s.geofenceRadius) : 0,
-          }));
-          setSites(rev as Site[]);
-        } else {
-          console.warn('API returned non-array data for sites');
-        }
-      } catch (err) {
-        console.error('Error loading sites:', err);
-        // If backend is not reachable, show error
-        toast({ 
-          title: 'Could not load sites from server', 
-          description: err instanceof Error ? err.message : 'Please check if the API is running.',
-          variant: 'destructive'
-        });
+  // Load sites from backend (on mount and after an import)
+  const loadSites = useCallback(async (isCancelled: () => boolean = () => false) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE_URL}/api/sites`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Failed to load sites:', res.status, errorText);
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
       }
+      const json = await res.json();
+      const data = parseApiData(json);
+      if (isCancelled()) return;
+      if (Array.isArray(data)) {
+        // normalize types
+        const rev = data.map((s: any) => ({
+          ...s,
+          createdAt: s.createdAt ? new Date(s.createdAt) : new Date(),
+          geofenceRadius: s.geofenceRadius ? Number(s.geofenceRadius) : 0,
+        }));
+        setSites(rev as Site[]);
+      } else {
+        console.warn('API returned non-array data for sites');
+      }
+    } catch (err) {
+      console.error('Error loading sites:', err);
+      // If backend is not reachable, show error
+      toast({ 
+        title: 'Could not load sites from server', 
+        description: err instanceof Error ? err.message : 'Please check if the API is running.',
+        variant: 'destructive'
+      });
     }
-    load();
-    return () => { cancelled = true; };
   }, [toast]);
 
-  const filteredSites = sites.filter(site => 
-    site.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    site.address.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    let cancelled = false;
+    loadSites(() => cancelled);
+    return () => { cancelled = true; };
+  }, [loadSites]);
+
+  // Import: each valid entry is created on the server (POST /api/sites), then the list is
+  // reloaded from the server. Entries that are invalid or already exist are skipped.
+  const importSites = async (text: string) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      toast({ title: 'Import failed', description: 'The file is not valid JSON.', variant: 'destructive' });
+      return;
+    }
+    const entries = Array.isArray(parsed) ? parsed
+      : parsed && typeof parsed === 'object' && Array.isArray((parsed as { sites?: unknown }).sites) ? (parsed as { sites: unknown[] }).sites
+      : null;
+    if (!entries) {
+      toast({ title: 'Import failed', description: 'Expected a list of sites (or { "sites": [...] }).', variant: 'destructive' });
+      return;
+    }
+
+    setIsImporting(true);
+    let saved = 0;
+    const skipped: string[] = [];
+    for (const [index, entry] of entries.entries()) {
+      const { site, error } = siteFromImport(entry, index);
+      if (!site) {
+        skipped.push(error || `Entry ${index + 1} is invalid`);
+        continue;
+      }
+      if (site.id && sites.some(s => s.id === site.id)) {
+        skipped.push(`"${site.name}": a site with this id already exists`);
+        continue;
+      }
+      try {
+        await fetchJson(`${API_BASE_URL}/api/sites`, 'POST', site);
+        saved += 1;
+      } catch (e) {
+        skipped.push(`"${site.name}": ${e instanceof Error ? e.message : 'could not be saved'}`);
+      }
+    }
+    setIsImporting(false);
+    await loadSites();
+
+    const details = skipped.length > 0
+      ? `${skipped.length} skipped. ${skipped.slice(0, 3).join('; ')}${skipped.length > 3 ? '; …' : ''}`
+      : 'All sites in the file were saved.';
+    toast({
+      title: `Imported ${saved} of ${entries.length} site${entries.length === 1 ? '' : 's'}`,
+      description: details,
+      variant: saved === 0 && entries.length > 0 ? 'destructive' : undefined,
+    });
+  };
+
+  const filteredSites = sites.filter(site =>
+    (site.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (site.address || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getGuardCount = (siteId: string) => {
@@ -131,31 +185,17 @@ export default function SitesPage() {
               const f = e.target.files?.[0];
               if (!f) return;
               const reader = new FileReader();
-              reader.onload = () => {
-                try {
-                  const parsed = JSON.parse(String(reader.result || ''));
-                  if (Array.isArray(parsed)) {
-                    setSites(parsed as Site[]);
-                    alert('Imported sites successfully');
-                  } else if (parsed && Array.isArray(parsed.sites)) {
-                    setSites(parsed.sites as Site[]);
-                    alert('Imported sites successfully');
-                  } else {
-                    alert('Invalid JSON format');
-                  }
-                } catch (err) {
-                  alert('Failed to parse JSON');
-                }
-              };
+              reader.onload = () => { importSites(String(reader.result || '')); };
+              reader.onerror = () => toast({ title: 'Import failed', description: 'The file could not be read.', variant: 'destructive' });
               reader.readAsText(f);
               // reset input
               (e.target as HTMLInputElement).value = '';
             }} style={{ display: 'none' }} />
 
-            <Button variant="outline" onClick={() => {
+            <Button variant="outline" disabled={isImporting} onClick={() => {
               const input = document.getElementById('site-import') as HTMLInputElement | null;
               input?.click();
-            }}>Import</Button>
+            }}>{isImporting ? 'Importing...' : 'Import'}</Button>
 
             <Button variant="glow" onClick={() => {
               const data = JSON.stringify(sites, null, 2);
@@ -207,7 +247,7 @@ export default function SitesPage() {
                 <div>
                   <div className="text-sm text-muted-foreground mb-2">Draw polygon on map (click to add points)</div>
                   <div className="w-full h-64 rounded-md overflow-hidden border">
-                    <MapContainer center={[activeSite?.location.lat || 12.97, activeSite?.location.lng || 77.59]} zoom={13} className="w-full h-full">
+                    <MapContainer center={[activeSite?.location?.lat || 12.97, activeSite?.location?.lng || 77.59]} zoom={13} className="w-full h-full">
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       <Polygon positions={polygonPoints.map(p => [p.lat, p.lng]) as any} pathOptions={{ color: 'blue', fillOpacity: 0.1 }} />
                       {polygonPoints.map((p, i) => (
@@ -240,12 +280,11 @@ export default function SitesPage() {
                 <Button variant="ghost" onClick={() => setIsConfigOpen(false)}>Cancel</Button>
                 <Button onClick={async () => {
                   if (!activeSite) return;
-                  // build updated site
-                  const updatedSite: any = { ...activeSite };
+                  // only the geofence fields are sent
+                  const updatedSite: any = {};
                   updatedSite.geofenceType = geofenceMode;
                   if (geofenceMode === 'radius') {
                     updatedSite.geofenceRadius = Number(radiusValue) || 0;
-                    delete updatedSite.geofencePolygon;
                   } else {
                     if (polygonPoints && polygonPoints.length > 0) {
                       updatedSite.geofencePolygon = polygonPoints.map(p => ({ lat: Number(p.lat), lng: Number(p.lng) }));
@@ -267,27 +306,18 @@ export default function SitesPage() {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify(updatedSite),
                     });
-                    console.log('[SitesPage] PUT payload:', updatedSite);
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const putResult = await res.json();
-                    console.log('[SitesPage] PUT result:', putResult);
-                    // server may only return { ok: true } — fetch the authoritative record
+                    if (!res.ok) throw new Error(getApiErrorMessage(await res.json().catch(() => null), `HTTP ${res.status}`));
+                    // the server only returns { ok: true } — fetch the authoritative record
                     let savedSite: any = null;
-                    if (putResult && putResult.ok) {
-                      const getRes = await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(activeSite.id))}`);
-                      console.log('[SitesPage] fetching authoritative site after PUT');
-                      if (getRes.ok) savedSite = await getRes.json();
-                      console.log('[SitesPage] GET result:', savedSite);
-                    } else {
-                      savedSite = putResult;
-                    }
+                    const getRes = await fetchWithAuth(`${API_BASE_URL}/api/sites/${encodeURIComponent(String(activeSite.id))}`);
+                    if (getRes.ok) savedSite = parseApiData(await getRes.json());
                     const merged = savedSite ? { ...activeSite, ...savedSite } : { ...activeSite };
                     // update local UI
                     const updated = sites.map(s => s.id === activeSite.id ? merged : s);
                     setSites(updated as Site[]);
                     toast({ title: 'Site saved', description: 'Geofence saved to server.' });
                   } catch (err) {
-                    toast({ title: 'Failed to save site', description: 'Could not connect to backend.' });
+                    toast({ title: 'Failed to save site', description: err instanceof Error ? err.message : 'Could not connect to backend.', variant: 'destructive' });
                   }
 
                   setIsConfigOpen(false);
@@ -377,7 +407,9 @@ export default function SitesPage() {
 
                 {/* Coordinates */}
                 <div className="text-xs text-muted-foreground font-mono p-2 rounded bg-muted/30 break-all">
-                  {site.location.lat.toFixed(4)}°N, {site.location.lng.toFixed(4)}°E
+                  {site.location && Number.isFinite(site.location.lat) && Number.isFinite(site.location.lng)
+                    ? `${site.location.lat.toFixed(4)}°N, ${site.location.lng.toFixed(4)}°E`
+                    : 'No location'}
                 </div>
 
                 {/* Actions */}
