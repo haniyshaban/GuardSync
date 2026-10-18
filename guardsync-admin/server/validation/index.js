@@ -1,5 +1,76 @@
 import { z } from 'zod';
-import { snakeToCamel } from '../utils/caseConverter.js';
+import { snakeToCamel, camelToSnake } from '../utils/caseConverter.js';
+
+/**
+ * Which key style a schema is written in: 'camel', 'snake', or 'either' when its keys are
+ * single words (or it is not an object schema).
+ */
+function keyStyle(schema) {
+  let inner = schema;
+  // Look through .refine(), .optional() and the like to the object underneath
+  while (inner && !(inner instanceof z.ZodObject)) {
+    if (inner instanceof z.ZodEffects) inner = inner.innerType();
+    else if (typeof inner.unwrap === 'function') inner = inner.unwrap();
+    else if (inner._def?.innerType) inner = inner._def.innerType;
+    else return 'either';
+  }
+  if (!inner) return 'either';
+  const keys = Object.keys(inner.shape);
+  const camel = keys.some((key) => /[A-Z]/.test(key));
+  const snake = keys.some((key) => key.includes('_'));
+  if (camel && !snake) return 'camel';
+  if (snake && !camel) return 'snake';
+  return 'either';
+}
+
+const keyCount = (data) => (data && typeof data === 'object' ? Object.keys(data).length : 0);
+
+/**
+ * Parse input in the key style of the schema.
+ * Request bodies and query strings arrive with snake_case keys (middleware/caseConverter.js),
+ * while schemas are written in either style. Parsing the wrong style does not fail: an
+ * all-optional schema just drops every two-word field, and the change is silently lost.
+ * So the input is converted to the schema's own style and parsed once. For a schema whose keys
+ * fit both styles, the parse that succeeds keeping more keys wins.
+ */
+function parseInSchemaStyle(schema, input) {
+  const style = keyStyle(schema);
+  const attempts = style === 'camel' ? [snakeToCamel(input)]
+    : style === 'snake' ? [camelToSnake(input)]
+    : [snakeToCamel(input), camelToSnake(input)];
+  let best = null;
+  for (const attempt of attempts) {
+    const result = schema.safeParse(attempt);
+    if (!best || (result.success && (!best.success || keyCount(result.data) > keyCount(best.data)))) {
+      best = result;
+    }
+  }
+  return best;
+}
+
+/**
+ * The first problem in plain words, e.g. "phone: Phone must be at least 10 characters".
+ * Field names are shown in camelCase, the way the apps send them.
+ */
+function firstIssueMessage(zodError) {
+  const issue = zodError.issues[0];
+  if (!issue) return 'Invalid request data';
+  const field = issue.path
+    .map((part) => (typeof part === 'string' ? part.replace(/_([a-z])/g, (m, letter) => letter.toUpperCase()) : part))
+    .join('.');
+  return field ? `${field}: ${issue.message}` : issue.message;
+}
+
+function validationError(res, zodError) {
+  return res.status(400).json({
+    success: false,
+    error: {
+      code: 'VALIDATION_ERROR',
+      message: firstIssueMessage(zodError),
+      details: zodError.issues,
+    }
+  });
+}
 
 /**
  * Validation middleware factory
@@ -8,24 +79,9 @@ import { snakeToCamel } from '../utils/caseConverter.js';
  */
 export function validate(schema) {
   return (req, res, next) => {
-    // Request bodies are converted to snake_case before they get here. Some schemas are
-    // written in snake_case and some in camelCase, so try the body both ways.
-    let result = schema.safeParse(req.body);
-    if (!result.success) {
-      const camel = schema.safeParse(snakeToCamel(req.body));
-      if (camel.success) result = camel;
-    }
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Invalid request data',
-          details: result.error.issues,
-        }
-      });
-    }
-    req.body = result.data; // use parsed/sanitized data
+    const result = parseInSchemaStyle(schema, req.body);
+    if (!result.success) return validationError(res, result.error);
+    req.body = result.data; // use parsed/sanitized data, in the schema's key style
     next();
   };
 }
@@ -61,17 +117,9 @@ export function validateParams(paramSchemas) {
  */
 export function validateQuery(schema) {
   return (req, res, next) => {
-    const result = schema.safeParse(req.query);
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Invalid query parameters',
-          details: result.error.issues,
-        }
-      });
-    }
+    // Query keys are snake_cased by the case converter too, so the same rule applies
+    const result = parseInSchemaStyle(schema, req.query);
+    if (!result.success) return validationError(res, result.error);
     req.query = result.data;
     next();
   };

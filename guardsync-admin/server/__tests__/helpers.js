@@ -106,6 +106,100 @@ export function createTestDb() {
       FOREIGN KEY (siteId) REFERENCES sites(id),
       FOREIGN KEY (guardId) REFERENCES guards(id)
     );
+
+    -- The tables below match db.js; routes that use the real repositories need them
+    CREATE TABLE IF NOT EXISTS site_guards (
+      id TEXT PRIMARY KEY,
+      site_id TEXT NOT NULL,
+      guard_id TEXT NOT NULL,
+      UNIQUE(site_id, guard_id),
+      FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+      FOREIGN KEY (guard_id) REFERENCES guards(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS site_patrol_points (
+      id TEXT PRIMARY KEY,
+      site_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      radius_meters REAL DEFAULT 50,
+      point_order INTEGER NOT NULL,
+      FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS site_geofence_points (
+      id TEXT PRIMARY KEY,
+      site_id TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      point_order INTEGER NOT NULL,
+      FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS guard_attendance (
+      id TEXT PRIMARY KEY,
+      guardId TEXT NOT NULL,
+      siteId TEXT,
+      clockIn TEXT NOT NULL,
+      clockOut TEXT,
+      withinGeofence INTEGER DEFAULT 1,
+      lat REAL,
+      lng REAL,
+      date TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS guard_notifications (
+      id TEXT PRIMARY KEY,
+      guardId TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      isRead INTEGER DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sos_alerts (
+      id TEXT PRIMARY KEY,
+      guardId TEXT NOT NULL,
+      guardName TEXT,
+      siteId TEXT,
+      siteName TEXT,
+      lat REAL,
+      lng REAL,
+      message TEXT,
+      status TEXT DEFAULT 'active',
+      createdAt TEXT NOT NULL,
+      resolvedAt TEXT,
+      resolvedBy TEXT,
+      resolvedNotes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS leave_requests (
+      id TEXT PRIMARY KEY,
+      guardId TEXT NOT NULL,
+      startDate TEXT NOT NULL,
+      endDate TEXT NOT NULL,
+      reason TEXT,
+      leaveType TEXT DEFAULT 'casual',
+      status TEXT DEFAULT 'pending',
+      appliedAt TEXT,
+      reviewedAt TEXT,
+      reviewedBy TEXT,
+      adminNotes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS system_config (
+      id TEXT PRIMARY KEY DEFAULT 'main',
+      usePremiumAPIs INTEGER DEFAULT 0,
+      faceRecognition TEXT DEFAULT 'local',
+      mapProvider TEXT DEFAULT 'openstreetmap',
+      locationUpdateInterval INTEGER DEFAULT 30,
+      geofenceStrictness TEXT DEFAULT 'medium',
+      autoClockOut INTEGER DEFAULT 1,
+      updatedAt TEXT
+    );
+    INSERT INTO system_config (id) VALUES ('main');
   `);
 
   return db;
