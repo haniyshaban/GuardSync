@@ -7,7 +7,7 @@ export const createLeaveRequestSchema = z.object({
   startDate: commonSchemas.dateISO,
   endDate: commonSchemas.dateISO,
   reason: z.string().min(1, 'Reason is required').max(500, 'Reason must be at most 500 characters'),
-  leaveType: z.enum(['casual', 'sick', 'emergency', 'planned', 'unpaid']).optional(),
+  leaveType: z.enum(['casual', 'sick', 'annual', 'emergency', 'planned', 'unpaid']).optional(),
 }).refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
   message: 'End date must be after or equal to start date',
   path: ['endDate'],

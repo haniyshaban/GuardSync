@@ -79,9 +79,14 @@ router.put('/:id', authMiddleware(true, ['staff', 'admin']), validate(updateLeav
   }
 });
 
-// DELETE leave request
-router.delete('/:id', authMiddleware(true, ['staff', 'admin']), (req, res) => {
+// DELETE leave request. A guard may cancel their own request while it is still pending.
+router.delete('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), ownsRow('leave_requests'), (req, res) => {
   try {
+    const row = leaveRepo.findById(req.params.id);
+    if (!row) return notFound(res, 'leave request', req.params.id);
+    if (req.user.role === 'guard' && row.status !== 'pending') {
+      return forbidden(res, 'Only a pending leave request can be cancelled');
+    }
     leaveRepo.delete(req.params.id);
     return success(res, { ok: true }, 200, 'Leave request deleted successfully');
   } catch (err) {
