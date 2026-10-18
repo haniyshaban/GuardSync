@@ -18,6 +18,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Minimize2,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -85,6 +86,20 @@ export default function LiveMapPage() {
   const [playbackGuardId, setPlaybackGuardId] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const focusSiteId = searchParams.get('site');
+  // Maximize fills the window with the map inside the page (no browser fullscreen needed)
+  const [isMapMaximized, setIsMapMaximized] = useState(false);
+
+  useEffect(() => {
+    // Leaflet redraws its tiles for the new size on a window resize event
+    const t = window.setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+    if (!isMapMaximized) return () => window.clearTimeout(t);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsMapMaximized(false); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [isMapMaximized]);
 
   const onlineGuards = guards.filter(g => g.status === 'online').length;
   const idleGuards = guards.filter(g => g.status === 'idle').length;
@@ -166,7 +181,13 @@ export default function LiveMapPage() {
                 </div>
             </div>
 
-            <Button variant="outline" size="icon">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsMapMaximized(true)}
+              aria-label="Maximize map"
+              title="Maximize map"
+            >
               <Maximize2 className="w-4 h-4" />
             </Button>
           </div>
@@ -175,8 +196,20 @@ export default function LiveMapPage() {
         {/* Map Content */}
         <div className="flex-1 flex flex-col lg:flex-row min-h-0">
           {/* Main Map */}
-          <div className="flex-1 p-4 min-h-0">
-            <div className="h-[60vh] sm:h-full min-h-[280px] rounded-lg overflow-hidden">
+          <div className={isMapMaximized ? 'fixed inset-0 z-[60] bg-background p-2' : 'flex-1 p-4 min-h-0'}>
+            {isMapMaximized && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsMapMaximized(false)}
+                className="absolute top-4 right-4 z-10 shadow-lg"
+                aria-label="Exit maximized map"
+              >
+                <Minimize2 className="w-4 h-4 mr-2" />
+                Exit
+              </Button>
+            )}
+            <div className={isMapMaximized ? 'h-full rounded-lg overflow-hidden' : 'h-[60vh] sm:h-full min-h-[280px] rounded-lg overflow-hidden'}>
               <LiveMap
                 guards={guards}
                 sites={sites}
@@ -368,7 +401,9 @@ export default function LiveMapPage() {
                       <Button size="sm" variant="ghost" onClick={() => { setPlaybackGuardId(selectedGuard.id); setPlaybackTrigger(t => t + 1); }}>Playback</Button>
                     </div>
                     <div className="sm:ml-auto w-full sm:w-auto">
-                      <Button variant="outline" className="w-full sm:w-auto" size="sm">View Full Profile</Button>
+                      <Button variant="outline" className="w-full sm:w-auto" size="sm" asChild>
+                        <Link to={`/guards/${selectedGuard.id}`}>View Full Profile</Link>
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
