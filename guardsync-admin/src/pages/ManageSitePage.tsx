@@ -467,7 +467,8 @@ export default function ManageSitePage() {
                     )}
 
                     {/* Patrol Route Map */}
-                    <div className="w-full h-96 rounded-md overflow-hidden border relative">
+                    {/* `isolate` keeps the z-[1000] map controls below the page's menus and overlays */}
+                    <div className="w-full h-96 rounded-md overflow-hidden border relative isolate">
                       {/* Radius input - top right */}
                       {patrolEditMode && (
                         <div className="absolute top-2 right-2 z-[1000] bg-background/95 backdrop-blur-sm p-2 rounded-lg shadow-lg border">

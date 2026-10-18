@@ -447,7 +447,9 @@ export function LiveMap({
   }
 
   return (
-    <div className="relative w-full h-full rounded-lg overflow-hidden border border-border">
+    // `isolate` keeps Leaflet's panes and the legend (z-index 400-1000) inside the map, so they
+    // never draw over the page's menus and overlays (the mobile sidebar is z-50)
+    <div className="relative isolate w-full h-full rounded-lg overflow-hidden border border-border">
       
       <MapContainer
         center={defaultCenter}
@@ -587,7 +589,7 @@ export function LiveMap({
                       {guard.status.charAt(0).toUpperCase() + guard.status.slice(1)}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">Last seen: {formatDistanceToNow(guard.lastSeen, { addSuffix: true })}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Last seen: {guard.lastSeen ? formatDistanceToNow(guard.lastSeen, { addSuffix: true }) : 'never'}</p>
                   {guard.clockedIn && guard.clockInTime && (
                     <p className="text-xs text-muted-foreground">Clocked in: {formatDistanceToNow(guard.clockInTime, { addSuffix: true })}</p>
                   )}
