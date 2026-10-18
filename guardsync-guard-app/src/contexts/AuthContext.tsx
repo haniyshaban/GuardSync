@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Guard, Shift } from '@/types/guard';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
+import { Guard, BankDetails } from '@/types/guard';
 import api from '@/services/api';
+import { errorMessage } from '@/lib/apiError';
+import { toast } from '@/hooks/use-toast';
 
 // Site type from platform server
 interface Site {
@@ -8,9 +10,39 @@ interface Site {
   name: string;
   address: string;
   location: { lat: number; lng: number };
+  geofenceRadius?: number;
   patrolRoute?: PatrolCheckpoint[];
   assignedGuards?: string[];
   isActive: boolean;
+}
+
+// The guard record as the server sends it (guardRowToObj on the server, seen by the guard)
+interface ApiGuard {
+  id: string;
+  name: string;
+  email?: string | null;
+  employeeId: string;
+  phone: string;
+  siteId?: string | null;
+  clockedIn?: boolean;
+  address?: string | null;
+  emergencyContact?: string | null;
+  dailyRate?: number | null;
+  dateOfJoining?: string | null;
+  aadharNumber?: string | null;
+  panNumber?: string | null;
+  bankDetails?: BankDetails | null;
+  shiftType?: string | null;
+  shiftStartTime?: string | null;
+  shiftEndTime?: string | null;
+  faceEnrolled?: boolean;
+}
+
+// What login and face login answer with
+interface LoginResponse {
+  token?: string;
+  guard: ApiGuard;
+  site: Site | null;
 }
 
 interface PatrolCheckpoint {
@@ -108,15 +140,88 @@ function writeStoredSession(value: string | null) {
   }
 }
 
+/**
+ * Turns the server's guard record into the app's Guard. Used at login and whenever the guard is
+ * reloaded from the server. `previous` is the guard the app already had, if any.
+ */
+function mapApiGuard(apiGuard: ApiGuard, site: Site | null, previous?: Guard | null): Guard {
+  const isNightShift = apiGuard.shiftType === 'night';
+  // Keep the shift id while the guard stays on the same site, so one shift's logs stay together
+  const sameSite = !!previous?.currentShift && previous.currentShift.siteId === apiGuard.siteId;
+  return {
+    id: apiGuard.id,
+    name: apiGuard.name,
+    email: apiGuard.email || previous?.email,
+    employeeId: apiGuard.employeeId,
+    phone: apiGuard.phone,
+    siteId: apiGuard.siteId || null,
+    status: apiGuard.clockedIn ? 'active' : 'off-duty',
+    isActive: true,
+    onboardingStatus: 'active',
+    // Personal details from API
+    address: apiGuard.address || undefined,
+    emergencyContact: apiGuard.emergencyContact || undefined,
+    dailyRate: apiGuard.dailyRate || undefined,
+    dateOfJoining: apiGuard.dateOfJoining || undefined,
+    // Documents (masked from API for security)
+    documents: {
+      aadharNumber: apiGuard.aadharNumber || undefined,
+      panNumber: apiGuard.panNumber || undefined,
+      photographUrl: undefined,
+      relievingLetterUrl: undefined,
+    },
+    // Bank details from API (the account number comes masked)
+    bankDetails: apiGuard.bankDetails || undefined,
+    // Current shift based on guard's assigned shift type
+    currentShift: apiGuard.siteId ? {
+      id: sameSite ? previous!.currentShift!.id : `shift-${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      startTime: apiGuard.shiftStartTime || (isNightShift ? '20:00' : '08:00'),
+      endTime: apiGuard.shiftEndTime || (isNightShift ? '08:00' : '20:00'),
+      location: site?.name || 'Assigned Site',
+      siteId: apiGuard.siteId,
+      status: 'scheduled',
+      isNightShift: isNightShift,
+    } : undefined,
+    faceEnrolled: !!apiGuard.faceEnrolled,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [guard, setGuard] = useState<Guard | null>(null);
   const [site, setSite] = useState<Site | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Which guard is logged in right now, for replies that arrive after a logout
+  const guardIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    guardIdRef.current = guard?.id ?? null;
+  }, [guard?.id]);
+
+  // Reload the guard (and their site) from the server, so changes made in the admin dashboard,
+  // such as a new name, phone or site, reach the phone. If the server refuses the session
+  // (expired, or the account was removed), the API client reports it and the guard is logged out.
+  const refreshSession = useCallback(async (guardId: string) => {
+    const response = await api.get<ApiGuard>(`/guards/${guardId}`);
+    if (!response.success || !response.data) return;
+    const apiGuard = response.data;
+    let freshSite: Site | null = null;
+    if (apiGuard.siteId) {
+      const siteResponse = await api.get<Site>(`/sites/${apiGuard.siteId}`);
+      // Keep what the app has rather than drop the site on a failed request
+      if (!siteResponse.success) return;
+      freshSite = siteResponse.data ?? null;
+    }
+    if (guardIdRef.current !== apiGuard.id) return;
+    setGuard((prev) => (prev && prev.id === apiGuard.id ? mapApiGuard(apiGuard, freshSite, prev) : prev));
+    setSite(freshSite);
+  }, []);
 
   // Restore session from localStorage on mount
   useEffect(() => {
     const stored = readStoredSession();
-    if (stored) {
+    // A saved guard is only a session if the login token is still there too
+    if (stored && api.getToken()) {
       try {
         const { guard: savedGuard, site: savedSite } = JSON.parse(stored);
         if (savedGuard) {
@@ -124,12 +229,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { faceDescriptor, ...rest } = savedGuard;
           setGuard({ ...rest, faceEnrolled: rest.faceEnrolled ?? !!faceDescriptor });
           setSite(savedSite || null);
+          guardIdRef.current = savedGuard.id;
+          refreshSession(savedGuard.id);
         }
       } catch (e) {
         console.error('Failed to restore auth session:', e);
       }
     }
     setIsLoading(false);
+  }, [refreshSession]);
+
+  // Reload the guard when the app comes back to the foreground
+  useEffect(() => {
+    const guardId = guard?.id;
+    if (!guardId) return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshSession(guardId);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [guard?.id, refreshSession]);
+
+  // The server no longer accepts this session: log out and say why
+  useEffect(() => {
+    api.onSessionEnded((error) => {
+      api.clearToken();
+      guardIdRef.current = null;
+      setGuard(null);
+      setSite(null);
+      toast({
+        title: 'Signed out',
+        description: error.code === 'ACCOUNT_INACTIVE'
+          ? 'This account is no longer active. Please contact your supervisor.'
+          : 'Your session has ended. Please log in again.',
+        variant: 'destructive',
+      });
+    });
+    return () => api.onSessionEnded(null);
   }, []);
 
   // Save session to localStorage when guard changes
@@ -139,10 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await api.post<{ success: boolean; guard: any; site: any; error?: string }>(
-        '/auth/login',
-        { email, password }
-      );
+      const response = await api.post<LoginResponse>('/auth/login', { email, password });
 
       if (response.success && response.data?.guard) {
         // Store the JWT token
@@ -150,54 +283,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           api.setToken(response.data.token);
         }
 
-        // Map API response to Guard type
-        const apiGuard = response.data.guard;
-        const isNightShift = apiGuard.shiftType === 'night';
-        const mappedGuard: Guard = {
-          id: apiGuard.id,
-          name: apiGuard.name,
-          email: apiGuard.email || email,
-          employeeId: apiGuard.employeeId,
-          phone: apiGuard.phone,
-          status: apiGuard.clockedIn ? 'active' : 'off-duty',
-          isActive: true,
-          onboardingStatus: 'active',
-          // Personal details from API
-          address: apiGuard.address || undefined,
-          emergencyContact: apiGuard.emergencyContact || undefined,
-          dailyRate: apiGuard.dailyRate || undefined,
-          dateOfJoining: apiGuard.dateOfJoining || undefined,
-          // Documents (masked from API for security)
-          documents: {
-            aadharNumber: apiGuard.aadharNumber || undefined,
-            panNumber: apiGuard.panNumber || undefined,
-            photographUrl: undefined,
-            relievingLetterUrl: undefined,
-          },
-          // Bank details from API
-          bankDetails: apiGuard.bankDetails || undefined,
-          // Current shift based on guard's assigned shift type
-          currentShift: apiGuard.siteId ? {
-            id: `shift-${Date.now()}`,
-            date: new Date().toISOString().split('T')[0],
-            startTime: apiGuard.shiftStartTime || (isNightShift ? '20:00' : '08:00'),
-            endTime: apiGuard.shiftEndTime || (isNightShift ? '08:00' : '20:00'),
-            location: response.data.site?.name || 'Assigned Site',
-            siteId: apiGuard.siteId,
-            status: 'scheduled',
-            isNightShift: isNightShift,
-          } : undefined,
-          faceEnrolled: !!apiGuard.faceEnrolled,
-        };
-
-        setGuard(mappedGuard);
-        setSite(response.data.site || null);
+        const loggedInSite = response.data.site || null;
+        const mappedGuard = mapApiGuard(response.data.guard, loggedInSite);
+        guardIdRef.current = mappedGuard.id;
+        setGuard({ ...mappedGuard, email: mappedGuard.email || email });
+        setSite(loggedInSite);
         return { success: true };
       }
 
-      // Extract error message properly from ApiResponse error object
-      const errorMessage = response.error?.message || response.error || 'Login failed';
-      return { success: false, error: errorMessage };
+      return { success: false, error: errorMessage(response.error, 'Login failed') };
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: 'Network error. Please check your connection.' };
@@ -208,53 +302,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // If guardId provided, use the face-login endpoint
     if (guardId) {
       try {
-        const response = await api.post<{ success: boolean; guard: any; site: any }>(
-          '/auth/face-login',
-          { guardId }
-        );
-        
+        const response = await api.post<LoginResponse>('/auth/face-login', { guardId });
+
         if (response.success && response.data?.guard) {
           // Store the JWT token
           if (response.data.token) {
             api.setToken(response.data.token);
           }
 
-          const apiGuard = response.data.guard;
-          const isNightShift = apiGuard.shiftType === 'night';
-          const mappedGuard: Guard = {
-            id: apiGuard.id,
-            name: apiGuard.name,
-            email: apiGuard.email,
-            employeeId: apiGuard.employeeId,
-            phone: apiGuard.phone,
-            status: apiGuard.clockedIn ? 'active' : 'off-duty',
-            isActive: true,
-            onboardingStatus: 'active',
-            address: apiGuard.address || undefined,
-            emergencyContact: apiGuard.emergencyContact || undefined,
-            dailyRate: apiGuard.dailyRate || undefined,
-            dateOfJoining: apiGuard.dateOfJoining || undefined,
-            documents: {
-              aadharNumber: apiGuard.aadharNumber || undefined,
-              panNumber: apiGuard.panNumber || undefined,
-              photographUrl: undefined,
-              relievingLetterUrl: undefined,
-            },
-            bankDetails: apiGuard.bankDetails || undefined,
-            currentShift: apiGuard.siteId ? {
-              id: `shift-${Date.now()}`,
-              date: new Date().toISOString().split('T')[0],
-              startTime: apiGuard.shiftStartTime || (isNightShift ? '20:00' : '08:00'),
-              endTime: apiGuard.shiftEndTime || (isNightShift ? '08:00' : '20:00'),
-              location: response.data.site?.name || 'Assigned Site',
-              siteId: apiGuard.siteId,
-              status: 'scheduled',
-              isNightShift: isNightShift,
-            } : undefined,
-            faceEnrolled: !!apiGuard.faceEnrolled,
-          };
+          const loggedInSite = response.data.site || null;
+          const mappedGuard = mapApiGuard(response.data.guard, loggedInSite);
+          guardIdRef.current = mappedGuard.id;
           setGuard(mappedGuard);
-          setSite(response.data.site || null);
+          setSite(loggedInSite);
           return true;
         }
       } catch (e) {
@@ -271,6 +331,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     api.clearToken();
+    guardIdRef.current = null;
     setGuard(null);
     setSite(null);
   };
