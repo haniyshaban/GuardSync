@@ -89,6 +89,25 @@ const DEMO_FALLBACK_GUARD: Guard = {
 
 const STORAGE_KEY = 'guardwise_auth';
 
+// Browser storage can be blocked (private mode, site data turned off), and then every access
+// throws. The app must still work; the session just isn't remembered across reloads.
+function readStoredSession(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSession(value: string | null) {
+  try {
+    if (value === null) localStorage.removeItem(STORAGE_KEY);
+    else localStorage.setItem(STORAGE_KEY, value);
+  } catch (e) {
+    console.warn('Could not save the session in browser storage:', e);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [guard, setGuard] = useState<Guard | null>(null);
   const [site, setSite] = useState<Site | null>(null);
@@ -96,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore session from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = readStoredSession();
     if (stored) {
       try {
         const { guard: savedGuard, site: savedSite } = JSON.parse(stored);
@@ -115,11 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Save session to localStorage when guard changes
   useEffect(() => {
-    if (guard) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ guard, site }));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    writeStoredSession(guard ? JSON.stringify({ guard, site }) : null);
   }, [guard, site]);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
