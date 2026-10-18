@@ -53,8 +53,12 @@ function CaptionDropdown({ displayMonth, onMonthChange, locale }: any) {
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
-  const initial = (props as any).month ?? new Date();
-  const [displayMonth, setDisplayMonth] = React.useState<Date>(initial instanceof Date ? initial : new Date(initial));
+  // Open on the month asked for, else the selected day's month, else today's
+  const selected = (props as { selected?: unknown }).selected;
+  const initial = props.month ?? props.defaultMonth ?? (selected instanceof Date ? selected : undefined) ?? new Date();
+  const [displayMonth, setDisplayMonth] = React.useState<Date>(
+    initial instanceof Date && !isNaN(initial.getTime()) ? initial : new Date()
+  );
 
   return (
     <DayPicker

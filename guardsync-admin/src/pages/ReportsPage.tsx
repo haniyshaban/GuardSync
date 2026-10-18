@@ -33,6 +33,12 @@ interface Site {
   name: string;
 }
 
+const REPORT_TYPES: Record<string, string> = {
+  attendance: 'Attendance',
+  activity: 'Guard Activity',
+  geofence: 'Geofence Breaches',
+};
+
 export default function ReportsPage() {
   const [fromDate, setFromDate] = useState<string>(new Date().toISOString().slice(0,10));
   const [toDate, setToDate] = useState<string>(new Date().toISOString().slice(0,10));
@@ -40,6 +46,7 @@ export default function ReportsPage() {
   const [toDateObj, setToDateObj] = useState<Date>(new Date(toDate));
   const [siteId, setSiteId] = useState<string>('all');
   const [reportType, setReportType] = useState<string>('attendance');
+  const [guardId, setGuardId] = useState<string>('all');
   
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [guards, setGuards] = useState<Guard[]>([]);
@@ -76,9 +83,16 @@ export default function ReportsPage() {
     fetchData();
   }, []);
 
+  // The dates are YYYY-MM-DD, so comparing the text compares the days
+  const isRangeValid = fromDate <= toDate;
+
   // Fetch attendance when filters change
   useEffect(() => {
     const fetchAttendance = async () => {
+      if (!isRangeValid) {
+        setAttendance([]);
+        return;
+      }
       try {
         const params = new URLSearchParams({
           from: fromDate,
@@ -97,18 +111,33 @@ export default function ReportsPage() {
       }
     };
     fetchAttendance();
-  }, [fromDate, toDate, siteId]);
+  }, [fromDate, toDate, siteId, isRangeValid]);
 
   const guardsById = useMemo(() => Object.fromEntries(guards.map(g => [g.id, g])), [guards]);
   const sitesById = useMemo(() => Object.fromEntries(sites.map(s => [s.id, s])), [sites]);
 
+  // Rows for the chosen report type:
+  //   attendance        every clock-in in the range
+  //   geofence breaches clock-ins made outside the site's geofence
+  //   guard activity    the chosen guard's clock-ins and outs (or every guard's)
   const filtered = useMemo(() => {
-    return attendance.map(l => ({
-      ...l,
-      guard: guardsById[l.guardId],
-      site: sitesById[l.siteId || ''],
-    }));
-  }, [attendance, guardsById, sitesById]);
+    return attendance
+      .filter(l => {
+        if (reportType === 'geofence') return l.withinGeofence === false;
+        if (reportType === 'activity') {
+          if (guardId !== 'all') return l.guardId === guardId;
+          return !!(l.clockIn || l.clockOut);
+        }
+        return true;
+      })
+      .map(l => ({
+        ...l,
+        guard: guardsById[l.guardId],
+        site: sitesById[l.siteId || ''],
+      }));
+  }, [attendance, guardsById, sitesById, reportType, guardId]);
+
+  const reportTitle = REPORT_TYPES[reportType] || reportType;
 
   function downloadCSV() {
     const rows = filtered.map(r => ({
@@ -143,7 +172,7 @@ export default function ReportsPage() {
     const e = escapeHtml;
     const html = `
       <html><head><title>Report</title></head><body>
-        <h2>Report: ${e(reportType)}</h2>
+        <h2>Report: ${e(reportTitle)}</h2>
         <p>From: ${e(fromDate)} To: ${e(toDate)}</p>
         <table border="1" cellpadding="6" cellspacing="0">
           <thead><tr><th>ID</th><th>Guard</th><th>Site</th><th>Clock In</th><th>Clock Out</th><th>Within Geofence</th></tr></thead>
@@ -184,6 +213,7 @@ export default function ReportsPage() {
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
+                      defaultMonth={fromDateObj}
                       selected={fromDateObj}
                       onSelect={(d) => {
                         if (d) {
@@ -205,6 +235,7 @@ export default function ReportsPage() {
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
+                      defaultMonth={toDateObj}
                       selected={toDateObj}
                       onSelect={(d) => {
                         if (d) {
@@ -232,24 +263,42 @@ export default function ReportsPage() {
                 <Select onValueChange={(v) => setReportType(v)} defaultValue="attendance">
                   <SelectTrigger className="w-full mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="attendance">Attendance</SelectItem>
-                    <SelectItem value="activity">Guard Activity</SelectItem>
-                    <SelectItem value="geofence">Geofence Breaches</SelectItem>
+                    {Object.entries(REPORT_TYPES).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+              {reportType === 'activity' && (
+                <div>
+                  <label className="text-sm text-muted-foreground">Guard</label>
+                  <Select onValueChange={(v) => setGuardId(v)} value={guardId}>
+                    <SelectTrigger className="w-full mt-2"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All guards</SelectItem>
+                      {guards.map(g => <SelectItem key={g.id} value={g.id}>{g.name || g.employeeId || g.id}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
+            {!isRangeValid && (
+              <p role="alert" className="text-sm text-destructive mt-3">
+                The From date must be on or before the To date.
+              </p>
+            )}
+
             <div className="flex flex-col md:flex-row gap-3 mt-4">
-              <Button onClick={downloadCSV} className="w-full md:w-auto">Export CSV</Button>
-              <Button variant="outline" onClick={openPrintable} className="w-full md:w-auto">Export PDF (Print)</Button>
+              <Button onClick={downloadCSV} disabled={!isRangeValid} className="w-full md:w-auto">Export CSV</Button>
+              <Button variant="outline" onClick={openPrintable} disabled={!isRangeValid} className="w-full md:w-auto">Export PDF (Print)</Button>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Preview ({filtered.length} rows) {isLoading && <Loader2 className="w-4 h-4 inline ml-2 animate-spin" />}</CardTitle>
+            <CardTitle>{reportTitle} preview ({filtered.length} rows) {isLoading && <Loader2 className="w-4 h-4 inline ml-2 animate-spin" />}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -268,7 +317,7 @@ export default function ReportsPage() {
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="p-4 text-center text-muted-foreground">
-                        {isLoading ? 'Loading...' : 'No attendance records found for the selected filters.'}
+                        {isLoading ? 'Loading...' : !isRangeValid ? 'Choose a From date on or before the To date.' : 'No records found for the selected filters.'}
                       </td>
                     </tr>
                   ) : (
