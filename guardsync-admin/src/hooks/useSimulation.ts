@@ -1,5 +1,5 @@
 import * as React from "react";
-import { fetchWithAuth } from '@/lib/api';
+import { fetchWithAuth, parseApiData } from '@/lib/api';
 import { config } from '@/lib/config';
 
 const OFFSET = 1e-4;
@@ -23,9 +23,9 @@ export default function useSimulation() {
       try {
         const res = await fetchWithAuth(`${API_BASE}/api/guards`);
         if (!res.ok) return;
-        const json = await res.json();
-        if (!mounted) return;
-        guardsRef.current = json.map((g: any) => ({ ...g }));
+        const data = parseApiData(await res.json());
+        if (!mounted || !Array.isArray(data)) return;
+        guardsRef.current = data.map((g: any) => ({ ...g }));
       } catch (e) {
         // ignore
       }
@@ -53,13 +53,18 @@ export default function useSimulation() {
 
       if (syncRef.current == null) {
         syncRef.current = window.setInterval(async () => {
-          // send updates to server
+          // send updates to server: only the simulated position, never the whole guard
+          // (that would write back stale values for everything else)
           for (const g of guardsRef.current) {
+            if (!g.location) continue;
             try {
               await fetchWithAuth(`${API_BASE}/api/guards/${g.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...g, lastSeen: new Date().toISOString() }),
+                body: JSON.stringify({
+                  location: { lat: Number(g.location.lat), lng: Number(g.location.lng) },
+                  lastSeen: new Date().toISOString(),
+                }),
               });
             } catch (e) {}
           }
