@@ -23,6 +23,30 @@ function generateSecurePassword(length = 16) {
   return password;
 }
 
+/**
+ * The demo guards' timestamps (lastSeen, clockInTime, location history) were written on fixed
+ * days. This maps them into the last hour, keeping their order, so a fresh demo agrees with
+ * today: guards seeded as on duty checked in today, and nobody was "last seen months ago".
+ */
+function demoTimeShifter(guards, now = Date.now()) {
+  const times = guards
+    .flatMap((g) => [g.lastSeen, g.clockInTime, ...(g.locationHistory || []).map((h) => h.at || h.timestamp)])
+    .map((t) => Date.parse(t))
+    .filter(Number.isFinite);
+  if (times.length === 0) return (t) => t;
+  const newest = Math.max(...times);
+  const oldest = Math.min(...times);
+  const startOfToday = new Date(now);
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  // The whole spread fits in the last hour (or in what there is of today so far)
+  const window = Math.min(60 * 60 * 1000, now - startOfToday.getTime());
+  const scale = newest > oldest ? Math.min(1, window / (newest - oldest)) : 0;
+  return (t) => {
+    const ms = Date.parse(t);
+    return Number.isFinite(ms) ? new Date(now - (newest - ms) * scale).toISOString() : t;
+  };
+}
+
 export async function seedDatabase() {
   try {
     const raw = fs.readFileSync(INITIAL_JSON, 'utf-8');
@@ -91,6 +115,9 @@ export async function seedDatabase() {
           @shiftType, @shiftStartTime, @shiftEndTime, @faceDescriptor
         )`);
         
+        const shiftTime = demoTimeShifter(parsed.guards);
+        const seededNow = new Date().toISOString();
+
         for (const g of parsed.guards) {
           // Use provided password, env var, or generated default
           const plainPassword = g.password || defaultGuardPassword;
@@ -120,12 +147,18 @@ export async function seedDatabase() {
             employeeId: g.employeeId,
             siteId: g.siteId || null,
             status: g.status || 'offline',
-            lastSeen: g.lastSeen || new Date().toISOString(),
+            lastSeen: g.lastSeen ? shiftTime(g.lastSeen) : seededNow,
             lat: g.location?.lat || null,
             lng: g.location?.lng || null,
-            locationHistory: g.locationHistory ? JSON.stringify(g.locationHistory) : '[]',
+            locationHistory: g.locationHistory
+              ? JSON.stringify(g.locationHistory.map((h) => ({
+                ...h,
+                ...(h.at ? { at: shiftTime(h.at) } : {}),
+                ...(h.timestamp ? { timestamp: shiftTime(h.timestamp) } : {}),
+              })))
+              : '[]',
             clockedIn: g.clockedIn ? 1 : 0,
-            clockInTime: g.clockInTime || null,
+            clockInTime: g.clockInTime ? shiftTime(g.clockInTime) : (g.clockedIn ? seededNow : null),
             currentShiftId: g.currentShiftId || null,
             address: encryptedAddress,
             emergencyContact: encryptedEmergencyContact,
@@ -148,6 +181,32 @@ export async function seedDatabase() {
           });
         }
         logger.info({ count: parsed.guards.length }, 'Seeded guards with hashed passwords');
+
+        // Make the rest of the demo agree with the guards:
+        // - a guard seeded as on duty has an open attendance row (so they can check out, and
+        //   the dashboard counts them as checked in today)
+        // - each site's guard list (site_guards, and the older assignedGuards copy) is the
+        //   guards whose siteId is that site
+        db.transaction(() => {
+          const guardRows = db.prepare('SELECT id, siteId, clockedIn, clockInTime, lat, lng FROM guards').all();
+          const siteIds = new Set(db.prepare('SELECT id FROM sites').all().map((row) => row.id));
+          const insertAttendance = db.prepare(`INSERT INTO guard_attendance (id, guardId, siteId, clockIn, clockOut, withinGeofence, lat, lng, date)
+            VALUES (?, ?, ?, ?, NULL, 1, ?, ?, ?)`);
+          const insertSiteGuard = db.prepare('INSERT OR IGNORE INTO site_guards (id, site_id, guard_id) VALUES (?, ?, ?)');
+          const guardsBySite = new Map([...siteIds].map((siteId) => [siteId, []]));
+          for (const row of guardRows) {
+            if (row.clockedIn && row.clockInTime) {
+              insertAttendance.run(crypto.randomUUID(), row.id, row.siteId || null, row.clockInTime, row.lat, row.lng, row.clockInTime.slice(0, 10));
+            }
+            if (row.siteId && siteIds.has(row.siteId)) {
+              insertSiteGuard.run(crypto.randomUUID(), row.siteId, row.id);
+              guardsBySite.get(row.siteId).push(row.id);
+            }
+          }
+          const updateSiteGuards = db.prepare('UPDATE sites SET assignedGuards = ? WHERE id = ?');
+          for (const [siteId, guardIds] of guardsBySite) updateSiteGuards.run(JSON.stringify(guardIds), siteId);
+        })();
+        logger.info('Seeded demo attendance for guards on duty, and site guard lists');
       }
       
       // Seed staff with generated passwords if empty  
