@@ -123,6 +123,22 @@ describe('Routes see the fields that were sent', () => {
     expect(response.body.data).toMatchObject({ locationUpdateInterval: 45, geofenceStrictness: 'high', autoClockOut: false });
   });
 
+  it('keeps the settings that were not sent', async () => {
+    await request(app)
+      .put('/api/config')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ locationUpdateInterval: 45, geofenceStrictness: 'high' })
+      .expect(200);
+    await request(app)
+      .put('/api/config')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ autoClockOut: false })
+      .expect(200);
+
+    const response = await request(app).get('/api/config').expect(200);
+    expect(response.body.data).toMatchObject({ locationUpdateInterval: 45, geofenceStrictness: 'high', autoClockOut: false });
+  });
+
   it('refuses an out-of-range setting with a plain message', async () => {
     const response = await request(app)
       .put('/api/config')
