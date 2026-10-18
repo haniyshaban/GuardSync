@@ -190,8 +190,8 @@ const Index = () => {
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header (stacks on phones so the buttons are not cut off) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Command Center</h1>
             <p className="text-muted-foreground mt-1">
