@@ -31,8 +31,10 @@ router.post('/', authMiddleware(true, ['staff', 'admin']), validate(createSiteSc
   const s = req.body;
   
   try {
-    siteRepo.createWithRelations(s);
-    return created(res, { ok: true }, 'Site created successfully');
+    // The server picks the id; a new site is active unless it says otherwise
+    const id = randomUUID();
+    siteRepo.createWithRelations({ ...s, id, isActive: s.isActive !== false });
+    return created(res, siteRepo.findByIdWithRelations(id), 'Site created successfully');
   } catch (err) {
     return serverError(res, String(err));
   }
@@ -43,18 +45,20 @@ router.put('/:id', authMiddleware(true, ['staff', 'admin']), validate(updateSite
   const s = req.body;
   
   try {
-    siteRepo.updateWithRelations(req.params.id, s);
+    // Only the fields that were sent change (see SiteRepository.updateWithRelations)
+    if (!siteRepo.updateWithRelations(req.params.id, s)) return notFound(res, 'site', req.params.id);
     return success(res, { ok: true }, 200, 'Site updated successfully');
   } catch (err) {
     return serverError(res, String(err));
   }
 });
 
-// DELETE /api/sites/:id - Delete site
+// DELETE /api/sites/:id - Delete site (its guards become unassigned)
 router.delete('/:id', authMiddleware(true, ['admin']), (req, res) => {
   try {
-    siteRepo.delete(req.params.id);
-    return success(res, { ok: true }, 200, 'Site deleted successfully');
+    const unassignedGuards = siteRepo.deleteWithRelations(req.params.id);
+    if (unassignedGuards === null) return notFound(res, 'site', req.params.id);
+    return success(res, { ok: true, unassignedGuards }, 200, 'Site deleted successfully');
   } catch (err) {
     return serverError(res, String(err));
   }

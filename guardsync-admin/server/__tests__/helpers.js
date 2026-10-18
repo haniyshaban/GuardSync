@@ -128,6 +128,16 @@ export function createTestDb() {
       FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS site_shifts (
+      id TEXT PRIMARY KEY,
+      site_id TEXT NOT NULL,
+      label TEXT,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      days_of_week TEXT NOT NULL,
+      FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS site_geofence_points (
       id TEXT PRIMARY KEY,
       site_id TEXT NOT NULL,

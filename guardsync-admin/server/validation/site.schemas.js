@@ -17,7 +17,22 @@ export const createSiteSchema = z.object({
   siteType: z.enum(['residential', 'commercial', 'industrial', 'educational', 'healthcare', 'government', 'other']).optional(),
   status: z.enum(['active', 'inactive', 'maintenance']).optional(),
   remarks: z.string().max(1000).optional(),
+  // What the dashboard's Manage Site page edits (stored by SiteRepository)
+  geofenceType: z.enum(['radius', 'polygon']).optional(),
+  geofencePolygon: z.array(z.object({
+    lat: commonSchemas.latitude,
+    lng: commonSchemas.longitude,
+  })).nullable().optional(),
+  isActive: z.boolean().optional(),
   assignedGuards: z.array(z.string()).optional(),
+  patrolRoute: z.array(z.object({
+    id: z.string().optional(),
+    name: z.string().min(1).max(100),
+    latitude: commonSchemas.latitude,
+    longitude: commonSchemas.longitude,
+    radiusMeters: z.number().min(1).max(1000).optional(),
+    order: z.number().int().min(0).optional(),
+  })).nullable().optional(),
   patrolPoints: z.array(z.object({
     id: z.string().optional(),
     name: z.string().min(1).max(100),
@@ -29,5 +44,5 @@ export const createSiteSchema = z.object({
   })).optional(),
 });
 
-// Site update schema (partial)
+// Site update schema (partial): only the fields that are sent are changed
 export const updateSiteSchema = createSiteSchema.partial();

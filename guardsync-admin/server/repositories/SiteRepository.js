@@ -154,47 +154,51 @@ export class SiteRepository extends BaseRepository {
   }
 
   /**
-   * Update site with all relations (transaction-safe)
+   * Update site with all relations (transaction-safe).
+   * Only the fields present in siteData change; everything else keeps its stored value.
+   * The guards, patrol points and geofence points are replaced only when that list was sent.
+   * Returns false when there is no such site.
    */
   updateWithRelations(id, siteData) {
     return this.transaction(() => {
+      const current = this.findById(id);
+      if (!current) return false;
+      const sent = (key) => siteData[key] !== undefined;
+
       // Update main site record
       const update = this.db.prepare(
         'UPDATE sites SET name=?,address=?,lat=?,lng=?,geofenceRadius=?,geofenceType=?,geofencePolygon=?,assignedGuards=?,isActive=?,patrolRoute=? WHERE id=?'
       );
       update.run(
-        siteData.name,
-        siteData.address,
-        siteData.location.lat,
-        siteData.location.lng,
-        siteData.geofenceRadius || 0,
-        siteData.geofenceType || 'radius',
-        siteData.geofencePolygon ? JSON.stringify(siteData.geofencePolygon) : null,
-        siteData.assignedGuards ? JSON.stringify(siteData.assignedGuards) : '[]',
-        siteData.isActive ? 1 : 0,
-        siteData.patrolRoute ? JSON.stringify(siteData.patrolRoute) : null,
+        sent('name') ? siteData.name : current.name,
+        sent('address') ? siteData.address : current.address,
+        sent('location') ? siteData.location.lat : current.lat,
+        sent('location') ? siteData.location.lng : current.lng,
+        sent('geofenceRadius') ? siteData.geofenceRadius : current.geofenceRadius,
+        sent('geofenceType') ? siteData.geofenceType : current.geofenceType,
+        sent('geofencePolygon') ? (siteData.geofencePolygon ? JSON.stringify(siteData.geofencePolygon) : null) : current.geofencePolygon,
+        sent('assignedGuards') ? JSON.stringify(siteData.assignedGuards || []) : current.assignedGuards,
+        sent('isActive') ? (siteData.isActive ? 1 : 0) : current.isActive,
+        sent('patrolRoute') ? (siteData.patrolRoute ? JSON.stringify(siteData.patrolRoute) : null) : current.patrolRoute,
         id
       );
 
-      // Delete old relations and insert new ones
-      this.db.prepare('DELETE FROM site_guards WHERE site_id = ?').run(id);
-      this.db.prepare('DELETE FROM site_patrol_points WHERE site_id = ?').run(id);
-      this.db.prepare('DELETE FROM site_geofence_points WHERE site_id = ?').run(id);
-
-      // Re-insert assigned guards
-      if (siteData.assignedGuards && Array.isArray(siteData.assignedGuards)) {
-        const insertGuard = this.db.prepare('INSERT INTO site_guards (id, site_id, guard_id) VALUES (?, ?, ?)');
-        for (const guardId of siteData.assignedGuards) {
+      // Replace assigned guards
+      if (sent('assignedGuards')) {
+        this.db.prepare('DELETE FROM site_guards WHERE site_id = ?').run(id);
+        const insertGuard = this.db.prepare('INSERT OR IGNORE INTO site_guards (id, site_id, guard_id) VALUES (?, ?, ?)');
+        for (const guardId of siteData.assignedGuards || []) {
           insertGuard.run(randomUUID(), id, guardId);
         }
       }
 
-      // Re-insert patrol route points
-      if (siteData.patrolRoute && Array.isArray(siteData.patrolRoute)) {
+      // Replace patrol route points
+      if (sent('patrolRoute')) {
+        this.db.prepare('DELETE FROM site_patrol_points WHERE site_id = ?').run(id);
         const insertPoint = this.db.prepare(
           'INSERT INTO site_patrol_points (id, site_id, name, latitude, longitude, radius_meters, point_order) VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
-        for (const point of siteData.patrolRoute) {
+        for (const point of siteData.patrolRoute || []) {
           insertPoint.run(
             point.id || randomUUID(),
             id,
@@ -207,16 +211,39 @@ export class SiteRepository extends BaseRepository {
         }
       }
 
-      // Re-insert geofence polygon points
-      if (siteData.geofencePolygon && Array.isArray(siteData.geofencePolygon)) {
+      // Replace geofence polygon points
+      if (sent('geofencePolygon')) {
+        this.db.prepare('DELETE FROM site_geofence_points WHERE site_id = ?').run(id);
         const insertGeoPoint = this.db.prepare(
           'INSERT INTO site_geofence_points (id, site_id, latitude, longitude, point_order) VALUES (?, ?, ?, ?, ?)'
         );
-        for (let i = 0; i < siteData.geofencePolygon.length; i++) {
-          const point = siteData.geofencePolygon[i];
-          insertGeoPoint.run(randomUUID(), id, point.lat, point.lng, i);
+        const polygon = siteData.geofencePolygon || [];
+        for (let i = 0; i < polygon.length; i++) {
+          insertGeoPoint.run(randomUUID(), id, polygon[i].lat, polygon[i].lng, i);
         }
       }
+      return true;
+    });
+  }
+
+  /**
+   * Delete a site and everything attached to it (transaction-safe).
+   * Its guards are unassigned (an enrolment waiting for approval stays pending), so nobody is
+   * left assigned to a site that no longer exists. Returns how many guards were unassigned,
+   * or null when there is no such site.
+   */
+  deleteWithRelations(id) {
+    return this.transaction(() => {
+      if (!this.findById(id)) return null;
+      const unassigned = this.db.prepare(
+        "UPDATE guards SET siteId = NULL, status = CASE WHEN status = 'pending' THEN status ELSE 'unassigned' END WHERE siteId = ?"
+      ).run(id).changes;
+      this.db.prepare('DELETE FROM site_guards WHERE site_id = ?').run(id);
+      this.db.prepare('DELETE FROM site_patrol_points WHERE site_id = ?').run(id);
+      this.db.prepare('DELETE FROM site_geofence_points WHERE site_id = ?').run(id);
+      this.db.prepare('DELETE FROM site_shifts WHERE site_id = ?').run(id);
+      this.db.prepare('DELETE FROM sites WHERE id = ?').run(id);
+      return unassigned;
     });
   }
 
