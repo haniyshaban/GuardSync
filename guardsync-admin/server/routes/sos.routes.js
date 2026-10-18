@@ -47,9 +47,15 @@ router.get('/:id', authMiddleware(true, ['guard', 'staff', 'admin']), ownsRow('s
 // POST /api/sos-alerts - Create a new SOS alert
 router.post('/', authMiddleware(true, ['guard', 'admin']), actAsSelf, validate(createSOSAlertSchema), (req, res) => {
   try {
-    const { guardId, guardName, siteId, siteName, lat, lng, message } = req.body;
+    const { guardId, guardName, lat, lng, message } = req.body;
     const id = randomUUID();
     const createdAt = new Date().toISOString();
+
+    // When the app does not send the site, use the one the guard is assigned to
+    const siteId = req.body.siteId || db.prepare('SELECT siteId FROM guards WHERE id = ?').get(guardId)?.siteId || null;
+    const siteName = req.body.siteName
+      || (siteId ? db.prepare('SELECT name FROM sites WHERE id = ?').get(siteId)?.name : null)
+      || null;
 
     db.prepare(`
       INSERT INTO sos_alerts (id, guardId, guardName, siteId, siteName, lat, lng, message, status, createdAt)

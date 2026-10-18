@@ -5,8 +5,9 @@ import { commonSchemas } from './index.js';
 export const createSOSAlertSchema = z.object({
   guardId: commonSchemas.id,
   guardName: z.string().min(1).max(100),
-  siteId: z.string().optional(),
-  siteName: z.string().max(200).optional(),
+  // The app may not know the guard's site: null or absent is fine (the server fills it in)
+  siteId: z.string().nullable().optional(),
+  siteName: z.string().max(200).nullable().optional(),
   lat: commonSchemas.latitude.optional(),
   lng: commonSchemas.longitude.optional(),
   message: z.string().max(500).optional(),
